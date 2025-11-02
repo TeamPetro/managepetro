@@ -43,42 +43,58 @@ class LLMService:
             r"(\d+)\.\s*(.*?)(?=\d+\.|$)", re.MULTILINE | re.DOTALL
         )
         self._section_regex = re.compile(
-            r"###\s*([^#]+?)\s*###(.*?)(?=###|$)", re.DOTALL
+            r"###\s*([^#\n]+?)\s*\n\s*(.*?)\s*(?=###|$)", re.DOTALL
         )
+
+    def clear_cache(self):
+        """Clear all cached data - useful for debugging or forcing fresh API calls"""
+        self._weather_cache.clear()
+        self._llm_cache.clear()
+        self._logger.info("Cache cleared")
 
     def _extract_section(self, ai_response: str, section_name: str) -> str:
         """
-        Helper method to extract a section from AI response using optimized regex
-        Returns the content between section_name and next ### marker
+        Helper method to extract a section from AI response using simple string operations
+        Returns the content between section_name and next ### or ## marker
         """
         try:
-            # Use pre-compiled regex for better performance
-            matches = self._section_regex.findall(ai_response)
+            # Try with ### first (three hashes), then ## (two hashes)
+            for hash_count in ["###", "##"]:
+                section_marker = f"{hash_count} {section_name.upper()}"
+                if section_marker in ai_response:
+                    # Find the start of the section
+                    start_idx = ai_response.find(section_marker)
+                    if start_idx == -1:
+                        continue
 
-            for match in matches:
-                header, content = match
-                if section_name.lower() in header.lower():
-                    return content.strip()
+                    # Move past the section header
+                    content_start = start_idx + len(section_marker)
+                    # Skip any leading whitespace/newlines
+                    while (
+                        content_start < len(ai_response)
+                        and ai_response[content_start] in "\n\r\t "
+                    ):
+                        content_start += 1
 
-            # Fallback to original method if regex doesn't match
-            if section_name not in ai_response:
-                return ""
+                    # Find the next section marker (try both ### and ##)
+                    next_section_markers = []
+                    for next_marker in ["### ", "## "]:  # Look for any next section
+                        marker_idx = ai_response.find(next_marker, content_start)
+                        if marker_idx != -1:
+                            next_section_markers.append(marker_idx)
 
-            section_content = ai_response.split(section_name)[1]
-            if "###" in section_content:
-                section_content = section_content.split("###")[0]
+                    if next_section_markers:
+                        end_idx = min(next_section_markers)
+                    else:
+                        end_idx = len(ai_response)
 
-            return section_content.strip()
+                    content = ai_response[content_start:end_idx].strip()
+                    return content
+
+            return ""
+
         except Exception:
-            # Fallback to original simple method
-            if section_name not in ai_response:
-                return ""
-
-            section_content = ai_response.split(section_name)[1]
-            if "###" in section_content:
-                section_content = section_content.split("###")[0]
-
-            return section_content.strip()
+            return ""
 
     def _clean_markdown(self, text: str) -> str:
         """
@@ -131,8 +147,7 @@ class LLMService:
         from_location: str,
         to_location: str,
         session: AsyncSession,
-        # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
+        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "gemini-2.5-flash"),
         departure_time: Optional[str] = None,
         arrival_time: Optional[str] = None,
         time_mode: str = "departure",
@@ -163,7 +178,19 @@ class LLMService:
             notes=notes,
         )
 
-        ai_response = await self._call_llm(comprehensive_prompt, llm_model)
+        # Get AI analysis (with error handling to prevent route optimization failure)
+        ai_response = ""
+        try:
+            ai_response = await self._call_llm(comprehensive_prompt, llm_model)
+        except Exception as e:
+            self._logger.warning(
+                "LLM call failed for route optimization, continuing without AI analysis: %s",
+                e,
+            )
+            ai_response = (
+                "AI analysis unavailable due to service temporarily unavailable."
+            )
+
         # Debug: log ai response type/size for troubleshooting frontend display issues
         try:
             self._logger.debug(
@@ -187,7 +214,7 @@ class LLMService:
         depot_location: str,
         session: AsyncSession,
         # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
+        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "gemini-2.5-flash"),
     ) -> Dict[str, Any]:
         """Optimize dispatch route for a truck to deliver fuel to stations in need using SQLAlchemy 2.0"""
         try:
@@ -221,8 +248,19 @@ class LLMService:
                 depot_weather=depot_weather,
             )
 
-            # Get AI optimization
-            ai_response = await self._call_llm(prompt, llm_model)
+            # Get AI optimization (with error handling)
+            ai_response = ""
+            try:
+                ai_response = await self._call_llm(prompt, llm_model)
+            except Exception as e:
+                self._logger.warning(
+                    "LLM call failed for dispatch optimization, continuing without AI analysis: %s",
+                    e,
+                )
+                ai_response = (
+                    "AI analysis unavailable due to service temporarily unavailable."
+                )
+
             # Debug: log ai response type/size for troubleshooting frontend display issues
             try:
                 self._logger.debug(
@@ -306,8 +344,18 @@ class LLMService:
                 max_recommendations=max_recommendations,
             )
 
-            # Get AI recommendations
-            ai_response = await self._call_llm(prompt, llm_model)
+            # Get AI recommendations (with error handling)
+            ai_response = ""
+            try:
+                ai_response = await self._call_llm(prompt, llm_model)
+            except Exception as e:
+                self._logger.warning(
+                    "LLM call failed for dispatch recommendations, returning basic recommendations: %s",
+                    e,
+                )
+                ai_response = (
+                    "AI analysis unavailable due to service temporarily unavailable."
+                )
 
             # Parse and return recommendations
             result = self._parse_batch_dispatch_response(
@@ -434,10 +482,10 @@ class LLMService:
                     for truck in trucks_orm
                 ]
 
-            # Execute all queries concurrently
-            stations, deliveries, trucks = await asyncio.gather(
-                get_stations(), get_deliveries(), get_trucks()
-            )
+            # Execute all queries sequentially (SQLAlchemy doesn't allow concurrent operations on same session)
+            stations = await get_stations()
+            deliveries = await get_deliveries()
+            trucks = await get_trucks()
 
             return DatabaseResult(stations, deliveries, trucks)
 
@@ -828,6 +876,9 @@ class LLMService:
                 cache_key in self._llm_cache
                 and current_time - self._llm_cache[cache_key]["timestamp"]
                 < self._cache_ttl
+                and self._llm_cache[cache_key][
+                    "data"
+                ]  # Ensure cached data is not empty
             ):
                 self._logger.debug(
                     "Using cached LLM response for key: %s", cache_key[:8]
@@ -848,20 +899,21 @@ class LLMService:
             result = result.replace("<", "&lt;").replace(">", "&gt;")
             result = result.strip()
 
-            # Cache the result
-            self._llm_cache[cache_key] = {"data": result, "timestamp": current_time}
+            # Only cache non-empty results
+            if result:
+                self._llm_cache[cache_key] = {"data": result, "timestamp": current_time}
 
-            # Limit cache size to prevent memory issues
-            if len(self._llm_cache) > 100:
-                # Remove oldest entries
-                oldest_keys = sorted(
-                    self._llm_cache.keys(),
-                    key=lambda k: self._llm_cache[k]["timestamp"],
-                )[
-                    :20
-                ]  # Remove 20 oldest
-                for key in oldest_keys:
-                    del self._llm_cache[key]
+                # Limit cache size to prevent memory issues
+                if len(self._llm_cache) > 100:
+                    # Remove oldest entries
+                    oldest_keys = sorted(
+                        self._llm_cache.keys(),
+                        key=lambda k: self._llm_cache[k]["timestamp"],
+                    )[
+                        :20
+                    ]  # Remove 20 oldest
+                    for key in oldest_keys:
+                        del self._llm_cache[key]
 
             return result
 
@@ -879,6 +931,15 @@ class LLMService:
         time_mode: str = "departure",
     ) -> Dict[str, Any]:
         """Parse AI response using standardized data models"""
+
+        # DEBUG: Print AI response to see what we're getting
+        print(f"DEBUG: AI Response (first 500 chars): {ai_response[:500]}")
+        print(
+            f"DEBUG: AI Response contains 'ROUTE SUMMARY': {'ROUTE SUMMARY' in ai_response}"
+        )
+        print(
+            f"DEBUG: AI Response contains 'TURN-BY-TURN': {'TURN-BY-TURN' in ai_response}"
+        )
 
         # Extract parsed data
         try:
@@ -1290,23 +1351,63 @@ class LLMService:
         """Parse AI response for batch dispatch recommendations"""
         recommendations = []
 
+        print(f"\n{'='*80}")
+        print(f"DISPATCH PARSING DEBUG")
+        print(f"{'='*80}")
+        print(f"AI Response Length: {len(ai_response)}")
+        print(f"AI Response Preview (first 1000 chars):\n{ai_response[:1000]}")
+        print(f"{'='*80}\n")
+
+        self._logger.debug(
+            f"Parsing batch dispatch response, AI response length: {len(ai_response)}"
+        )
+        self._logger.debug(
+            f"AI response preview (first 500 chars): {ai_response[:500]}"
+        )
+
         try:
             # Extract recommendations section
             recs_section = self._extract_section(
                 ai_response, "DISPATCH RECOMMENDATIONS"
             )
 
+            print(
+                f"Extracted section length: {len(recs_section) if recs_section else 0}"
+            )
+            print(
+                f"Section preview: {recs_section[:500] if recs_section else 'NONE FOUND'}\n"
+            )
+
+            self._logger.debug(
+                f"Extracted recommendations section length: {len(recs_section) if recs_section else 0}"
+            )
+            self._logger.debug(
+                f"Recommendations section preview: {recs_section[:300] if recs_section else 'NONE'}"
+            )
+
             if recs_section:
-                # Parse each recommendation
-                rec_blocks = recs_section.split("\n\n")
-                for block in rec_blocks:
+                # Parse each recommendation block (starts with **Recommendation X:**)
+                rec_blocks = recs_section.split("**Recommendation ")
+                self._logger.debug(f"Split into {len(rec_blocks)} blocks")
+
+                for block in rec_blocks[1:]:  # Skip the first empty part
                     if not block.strip():
                         continue
 
                     rec = {}
                     lines = block.strip().split("\n")
+                    self._logger.debug(
+                        f"Processing block with {len(lines)} lines, first line: {lines[0] if lines else 'EMPTY'}"
+                    )
 
-                    for line in lines:
+                    # Extract recommendation number
+                    if lines and lines[0].strip().endswith(":**"):
+                        rec["recommendation_number"] = (
+                            lines[0].strip().replace(":**", "")
+                        )
+
+                    # Parse the rest of the fields
+                    for line in lines[1:]:
                         line = line.strip()
                         if line.startswith("Truck:"):
                             rec["truck_code"] = line.replace("Truck:", "").strip()
@@ -1333,8 +1434,20 @@ class LLMService:
 
                     if rec.get("truck_code"):
                         recommendations.append(rec)
+                        self._logger.debug(
+                            f"Added recommendation for truck: {rec.get('truck_code')}"
+                        )
+                    else:
+                        self._logger.warning(
+                            f"Skipped recommendation block without truck_code"
+                        )
+
         except Exception:
             self._logger.exception("Error parsing batch dispatch recommendations")
+
+        self._logger.info(
+            f"Parsed {len(recommendations)} recommendations from AI response"
+        )
 
         # Extract summary
         summary = ""
