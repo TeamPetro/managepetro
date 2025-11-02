@@ -59,7 +59,14 @@ export const AuthProvider = ({ children }) => {
       // Auto-login after successful registration
       const loginResult = await login(username, password);
       return loginResult;
-    } catch {
+    } catch (error) {
+      // Handle registration errors specifically
+      if (error.response && error.response.data) {
+        return {
+          success: false,
+          error: error.response.data.detail || "Registration failed",
+        };
+      }
       return { success: false, error: "Network error. Please try again." };
     }
   };
