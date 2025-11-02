@@ -8,6 +8,7 @@ function DispatchRecommendationCard({
   recommendation,
   onViewDetails,
   onDispatch,
+  isDispatching = false,
 }) {
   const getPriorityColor = (priority) => {
     const colors = {
@@ -120,9 +121,17 @@ function DispatchRecommendationCard({
         </button>
         <button
           onClick={() => onDispatch(recommendation)}
-          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          disabled={isDispatching}
+          className={`flex-1 px-4 py-2 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2 ${
+            isDispatching
+              ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+              : "bg-blue-600 text-white hover:bg-blue-700"
+          }`}
         >
-          Dispatch Now
+          {isDispatching && (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+          )}
+          {isDispatching ? "Dispatching..." : "Dispatch Now"}
         </button>
       </div>
     </div>

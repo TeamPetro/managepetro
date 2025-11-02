@@ -42,6 +42,8 @@ function ImprovedDispatcherPage() {
   const [filterRegion, setFilterRegion] = useState("");
   const [filterCity, setFilterCity] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [dispatchingRecommendation, setDispatchingRecommendation] =
+    useState(null);
 
   // Fetch data using React Query
   const {
@@ -108,6 +110,7 @@ function ImprovedDispatcherPage() {
 
   const handleDispatchRecommendation = async (recommendation) => {
     setDispatchError(null);
+    setDispatchingRecommendation(recommendation);
 
     // Find the truck code from recommendation
     const truckCode = recommendation.truck_code;
@@ -123,10 +126,12 @@ function ImprovedDispatcherPage() {
           const transformedResult = Api.transformDispatchResponse(result);
           setDispatchResult(transformedResult);
           setSelectedRecommendation(null);
+          setDispatchingRecommendation(null);
         },
         onError: (error) => {
           setDispatchResult(null);
           setDispatchError(error?.message || "Dispatch failed");
+          setDispatchingRecommendation(null);
         },
       }
     );
@@ -566,9 +571,21 @@ function ImprovedDispatcherPage() {
                   onClick={() => {
                     handleDispatchRecommendation(selectedRecommendation);
                   }}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={
+                    dispatchingRecommendation === selectedRecommendation
+                  }
+                  className={`flex-1 px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                    dispatchingRecommendation === selectedRecommendation
+                      ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
                 >
-                  Dispatch This Route
+                  {dispatchingRecommendation === selectedRecommendation && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                  )}
+                  {dispatchingRecommendation === selectedRecommendation
+                    ? "Dispatching Route..."
+                    : "Dispatch This Route"}
                 </button>
               </div>
             </div>
@@ -618,6 +635,7 @@ function ImprovedDispatcherPage() {
                     recommendation={rec}
                     onViewDetails={handleViewDetails}
                     onDispatch={handleDispatchRecommendation}
+                    isDispatching={dispatchingRecommendation === rec}
                   />
                 ))}
               </div>
