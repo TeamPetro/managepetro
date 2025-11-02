@@ -19,6 +19,7 @@ import {
   Cog6ToothIcon,
   ExclamationTriangleIcon,
   FunnelIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import Api from "../services/api";
 import {
@@ -55,10 +56,7 @@ function ImprovedDispatcherPage() {
   } = useStations();
 
   // Fetch available filters
-  const {
-    data: filtersData,
-    isPending: filtersLoading,
-  } = useDispatchFilters();
+  const { data: filtersData } = useDispatchFilters();
 
   // Fetch AI recommendations
   const {
@@ -229,7 +227,7 @@ function ImprovedDispatcherPage() {
               {showFilters ? "Hide Filters" : "Show Filters"}
             </button>
           </div>
-          
+
           {showFilters && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -292,7 +290,7 @@ function ImprovedDispatcherPage() {
               </div>
             </div>
           )}
-          
+
           {(filterRegion || filterCity) && (
             <div className="mt-3 flex items-center space-x-2 text-sm">
               <span className="text-gray-600">Active filters:</span>
@@ -318,7 +316,7 @@ function ImprovedDispatcherPage() {
       )}
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 sm:mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 sm:mb-8">
         <div className="bg-white rounded-lg shadow p-4 sm:p-6">
           <div className="text-xs sm:text-sm font-medium text-gray-500">
             Active Trucks
@@ -335,15 +333,15 @@ function ImprovedDispatcherPage() {
             {stationsNeedingFuel.length}
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4 sm:p-6 border-2 border-red-200">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6 border-2 border-orange-200">
           <div className="text-xs sm:text-sm font-medium text-gray-500 flex items-center">
-            <ExclamationTriangleIcon className="w-4 h-4 text-red-500 mr-1" />
-            Critical Stations
+            <ExclamationTriangleIcon className="w-4 h-4 text-orange-500 mr-1" />
+            High Priority Stations
           </div>
-          <div className="mt-1 text-2xl sm:text-3xl font-semibold text-red-600">
-            {criticalStations.length}
+          <div className="mt-1 text-2xl sm:text-3xl font-semibold text-orange-600">
+            {highPriorityStations.length}
           </div>
-          <div className="text-xs text-gray-500 mt-1">&lt; 20% fuel</div>
+          <div className="text-xs text-gray-500 mt-1">20-30% fuel</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4 sm:p-6">
           <div className="text-xs sm:text-sm font-medium text-gray-500">
@@ -377,8 +375,8 @@ function ImprovedDispatcherPage() {
                 ) : (
                   ""
                 )}{" "}
-                to create the most efficient delivery plan, prioritizing critical
-                stations and minimizing total distance.
+                to create the most efficient delivery plan, prioritizing
+                critical stations and minimizing total distance.
               </p>
             </div>
             <button
@@ -409,6 +407,175 @@ function ImprovedDispatcherPage() {
         </div>
       )}
 
+      {/* Dispatch Error */}
+      {dispatchError && (
+        <div className="mb-6">
+          <ErrorMessage
+            message={`Dispatch failed: ${dispatchError}`}
+            onDismiss={() => setDispatchError(null)}
+          />
+        </div>
+      )}
+
+      {/* Recommendation Details Modal */}
+      {selectedRecommendation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                  <SparklesIcon className="w-6 h-6 text-blue-600 mr-2" />
+                  Dispatch Recommendation Details
+                </h2>
+                <button
+                  onClick={() => setSelectedRecommendation(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Basic Info */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    Assignment
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-sm text-gray-500">Truck</span>
+                      <div className="font-medium">
+                        {selectedRecommendation.truck_code}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-500">Priority</span>
+                      <div className="font-medium">
+                        {selectedRecommendation.priority}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Route Details */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    Route Details
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <span className="text-sm text-gray-500">Stations</span>
+                      <div className="font-medium">
+                        {selectedRecommendation.station_count}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-500">Distance</span>
+                      <div className="font-medium">
+                        {selectedRecommendation.total_distance}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-500">Duration</span>
+                      <div className="font-medium">
+                        {selectedRecommendation.estimated_duration}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-500">
+                        Fuel Delivery
+                      </span>
+                      <div className="font-medium">
+                        {selectedRecommendation.total_fuel_delivery}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Route Summary */}
+                {selectedRecommendation.route_summary && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-900 mb-2">
+                      Route Summary
+                    </h3>
+                    <p className="text-gray-700">
+                      {selectedRecommendation.route_summary}
+                    </p>
+                  </div>
+                )}
+
+                {/* AI Rationale */}
+                {selectedRecommendation.rationale && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-900 mb-2">
+                      AI Rationale
+                    </h3>
+                    <p className="text-gray-700">
+                      {selectedRecommendation.rationale}
+                    </p>
+                  </div>
+                )}
+
+                {/* Station Details */}
+                {selectedRecommendation.stations &&
+                  selectedRecommendation.stations.length > 0 && (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h3 className="font-semibold text-gray-900 mb-2">
+                        Stations to Visit
+                      </h3>
+                      <div className="space-y-2">
+                        {selectedRecommendation.stations.map(
+                          (station, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0"
+                            >
+                              <div>
+                                <div className="font-medium">
+                                  {station.name}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {station.city}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-medium">
+                                  {station.fuel_level_percent}% fuel
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {station.fuel_type}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setSelectedRecommendation(null)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    handleDispatchRecommendation(selectedRecommendation);
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Dispatch This Route
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AI Recommendations Section */}
       {showRecommendations && !dispatchResult && (
         <div className="mb-8">
@@ -428,7 +595,10 @@ function ImprovedDispatcherPage() {
           {recommendationsError && (
             <div className="mb-4">
               <AIErrorMessage
-                message={recommendationsError?.message || "Failed to load recommendations"}
+                message={
+                  recommendationsError?.message ||
+                  "Failed to load recommendations"
+                }
                 context="dispatch recommendations"
                 onRetry={refetchRecommendations}
                 onDismiss={() => setShowRecommendations(false)}
@@ -440,18 +610,6 @@ function ImprovedDispatcherPage() {
             <LoadingState message="AI is analyzing optimal dispatch strategies..." />
           ) : recommendationsData?.recommendations?.length > 0 ? (
             <>
-              {/* Executive Summary */}
-              {recommendationsData.summary && (
-                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h3 className="text-sm font-semibold text-blue-900 mb-2">
-                    Executive Summary
-                  </h3>
-                  <p className="text-sm text-blue-800">
-                    {recommendationsData.summary}
-                  </p>
-                </div>
-              )}
-
               {/* Recommendations Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {recommendationsData.recommendations.map((rec, index) => (
@@ -463,6 +621,18 @@ function ImprovedDispatcherPage() {
                   />
                 ))}
               </div>
+
+              {/* Executive Summary */}
+              {recommendationsData.summary && (
+                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 my-4">
+                  <h3 className="text-sm font-semibold text-blue-900 mb-2">
+                    Executive Summary
+                  </h3>
+                  <p className="text-sm text-blue-800">
+                    {recommendationsData.summary}
+                  </p>
+                </div>
+              )}
             </>
           ) : (
             <div className="text-center py-12 bg-gray-50 rounded-lg">

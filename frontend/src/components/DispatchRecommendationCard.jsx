@@ -1,6 +1,14 @@
-import { SparklesIcon, TruckIcon, MapPinIcon, ClockIcon } from "@heroicons/react/24/outline";
+import {
+  SparklesIcon,
+  TruckIcon,
+  MapPinIcon,
+} from "@heroicons/react/24/outline";
 
-function DispatchRecommendationCard({ recommendation, onViewDetails, onDispatch }) {
+function DispatchRecommendationCard({
+  recommendation,
+  onViewDetails,
+  onDispatch,
+}) {
   const getPriorityColor = (priority) => {
     const colors = {
       Critical: "border-red-500 bg-red-50",

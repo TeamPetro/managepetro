@@ -5,7 +5,7 @@ from sqlalchemy import select, and_, or_, func, text
 from sqlalchemy.exc import SQLAlchemyError
 from .prompt_service import PromptService
 from .api_utils import get_weather_async
-from config import config
+import re
 from models.database_models import Station, Truck, Delivery
 from models.data_models import (
     StationData,
@@ -23,7 +23,7 @@ from utils.serializers import station_available_dict, truck_simple_dict
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from .lc_router import get_chat_model
-import os 
+import os
 
 
 class LLMService:
@@ -53,8 +53,6 @@ class LLMService:
         if not text:
             return text
 
-        import re
-
         cleaned = text
         # Remove bold markdown (**text**)
         cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", cleaned)
@@ -69,7 +67,7 @@ class LLMService:
 
         return cleaned.strip()
 
-    def _parse_key_value_lines(self, text: str, mappings: dict) -> dict:
+    def _parse_key_value_lines(self, text: str, mappings: dict) -> Dict[str, Any]:
         """
         Helper method to parse key-value pairs from text lines
         mappings: dict of {search_key: result_key}
@@ -94,18 +92,18 @@ class LLMService:
         return result
 
     async def optimize_route(
-    self,
-    from_location: str,
-    to_location: str,
-    session: AsyncSession,
-    # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
-    llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
-    departure_time: Optional[str] = None,
-    arrival_time: Optional[str] = None,
-    time_mode: str = "departure",
-    delivery_date: Optional[str] = None,
-    vehicle_type: str = "fuel_delivery_truck",
-    notes: Optional[str] = None,
+        self,
+        from_location: str,
+        to_location: str,
+        session: AsyncSession,
+        # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
+        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
+        departure_time: Optional[str] = None,
+        arrival_time: Optional[str] = None,
+        time_mode: str = "departure",
+        delivery_date: Optional[str] = None,
+        vehicle_type: str = "fuel_delivery_truck",
+        notes: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate route optimization using standardized data models with SQLAlchemy 2.0"""
 
@@ -149,18 +147,24 @@ class LLMService:
         )
 
     async def optimize_dispatch(
-    self,
-    truck_id: str,
-    depot_location: str,
-    session: AsyncSession,
-    # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
-    llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
+        self,
+        truck_id: str,
+        depot_location: str,
+        session: AsyncSession,
+        # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
+        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
     ) -> Dict[str, Any]:
         """Optimize dispatch route for a truck to deliver fuel to stations in need using SQLAlchemy 2.0"""
         try:
+            self._logger.info(
+                "Starting dispatch optimization for truck_id: %s, depot: %s",
+                truck_id,
+                depot_location,
+            )
             # Get truck details using SQLAlchemy
             truck = await self._get_truck_by_id_sqlalchemy(session, truck_id)
             if not truck:
+                self._logger.error("Truck not found: %s", truck_id)
                 raise ValueError(f"Truck {truck_id} not found")
 
             # Get stations needing fuel using SQLAlchemy
@@ -277,11 +281,11 @@ class LLMService:
                 stations=stations_needing_fuel,
                 depot_location=depot_location,
             )
-            
+
             # Add filter information to response
             result["filter_region"] = filter_region
             result["filter_city"] = filter_city
-            
+
             return result
 
         except Exception as e:
@@ -415,7 +419,7 @@ class LLMService:
 
     async def get_all_stations_sqlalchemy(
         self, session: AsyncSession
-    ) -> list[StationData]:
+    ) -> List[StationData]:
         """Get all stations using SQLAlchemy 2.0 - new method"""
         try:
             stmt = select(Station).order_by(Station.name)
@@ -461,7 +465,7 @@ class LLMService:
             self._logger.exception("Failed to get stations")
             return []
 
-    async def get_all_trucks_sqlalchemy(self, session: AsyncSession) -> list[TruckData]:
+    async def get_all_trucks_sqlalchemy(self, session: AsyncSession) -> List[TruckData]:
         """Get all trucks using SQLAlchemy 2.0 - new method"""
         try:
             stmt = select(Truck).order_by(Truck.code)
@@ -520,7 +524,7 @@ class LLMService:
             for truck_orm in trucks_orm:
                 # Get compartments
                 await session.refresh(truck_orm, attribute_names=["compartments"])
-                
+
                 compartments = []
                 for comp in truck_orm.compartments:
                     compartments.append(
@@ -548,7 +552,7 @@ class LLMService:
                         compartments=compartments,
                     )
                 )
-            
+
             return trucks
         except SQLAlchemyError as e:
             self._logger.exception("SQLAlchemy error getting active trucks")
@@ -563,6 +567,13 @@ class LLMService:
         """Get truck by ID using SQLAlchemy 2.0"""
         try:
             self._logger.debug("Looking for truck with identifier: %s", truck_id)
+
+            # Parse display format like "T10 (CA-2211)" to extract "T10"
+            if " (" in truck_id and truck_id.endswith(")"):
+                truck_id = truck_id.split(" (")[0]
+                self._logger.debug(
+                    "Parsed display format to truck identifier: %s", truck_id
+                )
 
             # Handle different truck ID formats
             if truck_id.startswith("truck-"):
@@ -636,7 +647,10 @@ class LLMService:
             return None
 
     async def _get_stations_needing_refuel_sqlalchemy(
-        self, session: AsyncSession, filter_region: Optional[str] = None, filter_city: Optional[str] = None
+        self,
+        session: AsyncSession,
+        filter_region: Optional[str] = None,
+        filter_city: Optional[str] = None,
     ) -> List[StationData]:
         """Get stations that need refueling using SQLAlchemy 2.0 with optional filters"""
         try:
@@ -648,13 +662,13 @@ class LLMService:
                 Station.low_fuel_threshold.isnot(None),
                 Station.current_level_liters < Station.low_fuel_threshold,
             ]
-            
+
             # Add regional filters if provided
             if filter_region:
                 filter_conditions.append(Station.region == filter_region)
             if filter_city:
                 filter_conditions.append(Station.city == filter_city)
-            
+
             # Calculate fuel percentage and filter for low fuel stations
             stmt = (
                 select(Station)
@@ -683,8 +697,6 @@ class LLMService:
                     current_level_liters=station.current_level_liters,
                     request_method=station.request_method,
                     low_fuel_threshold=station.low_fuel_threshold,
-                    needs_refuel=station.current_level_liters
-                    < station.low_fuel_threshold,
                 )
                 stations.append(station_data)
 
@@ -696,104 +708,6 @@ class LLMService:
             self._logger.exception("Failed to get stations needing refuel")
             return []
 
-    async def _call_gemini(self, prompt: str, model: str) -> str:
-        """Make the actual Gemini API call with proper error handling"""
-        try:
-            # Note: wrap the SDK call in a try/except; we will normalize output
-            # to a string below and sanitize it before returning.
-            response = await self.client.aio.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.1,
-                    max_output_tokens=3000,
-                ),
-            )
-
-            # Normalize response into a plain string so downstream code and the
-            # frontend always receive a consistent `ai_analysis` field.
-            ai_text = ""
-
-            # Preferred attribute used in existing code
-            if response is None:
-                ai_text = ""
-            elif hasattr(response, "text"):
-                # Some client versions provide `text` as the generated content
-                ai_text = response.text or ""
-            else:
-                # Fallbacks: try common container shapes then str()
-                try:
-                    # Some SDKs return `outputs` or `output` lists
-                    if hasattr(response, "outputs"):
-                        parts = []
-                        for out in getattr(response, "outputs"):
-                            if hasattr(out, "text"):
-                                parts.append(out.text)
-                            elif isinstance(out, str):
-                                parts.append(out)
-                        ai_text = "\n".join(parts)
-                    elif hasattr(response, "output"):
-                        parts = []
-                        for out in getattr(response, "output"):
-                            # nested shapes
-                            if isinstance(out, dict):
-                                # try common keys
-                                for key in ("content", "text", "message"):
-                                    if key in out:
-                                        parts.append(str(out[key]))
-                            elif isinstance(out, str):
-                                parts.append(out)
-                        ai_text = "\n".join(parts)
-                    else:
-                        ai_text = str(response)
-                except Exception:
-                    # Last resort: stringify the whole response
-                    ai_text = str(response)
-
-            # Log basic diagnostics
-            try:
-                self._logger.debug(
-                    "Gemini response normalized type=%s length=%s",
-                    type(ai_text),
-                    len(ai_text),
-                )
-            except Exception:
-                self._logger.exception("Gemini response normalized repr logging failed")
-
-            # Sanitize AI text to reduce risk of script injection or accidental
-            # HTML being interpreted by clients. We remove script tags and
-            # then escape angle brackets. Frontend should still render as text.
-            try:
-                # Remove <script>...</script> blocks (case-insensitive)
-                ai_text = re.sub(
-                    r"(?i)<script.*?>.*?</script>", "", ai_text, flags=re.DOTALL
-                )
-                # Escape angle brackets to prevent any accidental HTML rendering
-                ai_text = ai_text.replace("<", "&lt;").replace(">", "&gt;")
-            except Exception:
-                # If sanitization fails, log and return the raw text as a fallback
-                self._logger.exception("Failed to sanitize ai_text")
-
-            return ai_text
-
-        except Exception as e:
-            error_msg = str(e)
-            if (
-                "quota" in error_msg.lower()
-                or "resource_exhausted" in error_msg.lower()
-            ):
-                self._logger.exception("API quota exceeded: %s", e)
-                raise Exception(
-                    "API quota exceeded. Please check your API limits or wait before retrying."
-                )
-            elif "not_found" in error_msg.lower():
-                self._logger.exception("model not found: %s", e)
-                raise Exception(
-                    f"Model '{model}' not found. Please check if the model name is correct."
-                )
-            else:
-                self._logger.exception("API call failed: %s", e)
-                raise
     async def _call_llm(self, prompt: str, model_id: str) -> str:
         """
         Generic async LLM call via LangChain with multi-provider support
@@ -807,8 +721,6 @@ class LLMService:
 
             result = await chain.ainvoke({"input": prompt})
 
-            # Sanitize basic HTML/Markdown
-            import re
             result = re.sub(r"(?i)<script.*?>.*?</script>", "", result, flags=re.DOTALL)
             result = result.replace("<", "&lt;").replace(">", "&gt;")
 
@@ -910,7 +822,6 @@ class LLMService:
         - Parses inline and next-line distance/duration info
         """
 
-        import re
         directions = []
 
         try:
@@ -940,7 +851,11 @@ class LLMService:
 
                 # 3️⃣ Try inline "(12.3 km, 15 min)" format
                 paren_match = re.search(r"\(([^)]+)\)", instruction)
-                if paren_match and "km" in paren_match.group(1) and "min" in paren_match.group(1):
+                if (
+                    paren_match
+                    and "km" in paren_match.group(1)
+                    and "min" in paren_match.group(1)
+                ):
                     parts = [p.strip() for p in paren_match.group(1).split(",")]
                     if len(parts) >= 2:
                         distance, duration = parts[0], parts[1]
@@ -949,7 +864,9 @@ class LLMService:
 
                 # 4️⃣ Try next-line "Distance: ... | Duration: ..." format
                 step_end = match.end()
-                next_chunk = text_to_parse[step_end:].split("\n", 3)[:3]  # next few lines
+                next_chunk = text_to_parse[step_end:].split("\n", 3)[
+                    :3
+                ]  # next few lines
                 for line in next_chunk:
                     line = line.strip()
                     if "Distance:" in line and "Duration:" in line and "|" in line:
@@ -985,7 +902,9 @@ class LLMService:
 
             # 6️⃣ Fallback: Look for numbered lines in the entire AI response if section is empty
             if not directions:
-                fallback_steps = re.findall(r"^\s*(\d+)[\.\)\-]\s+(.*)$", ai_response, flags=re.M)
+                fallback_steps = re.findall(
+                    r"^\s*(\d+)[\.\)\-]\s+(.*)$", ai_response, flags=re.M
+                )
                 for idx, (_, instr) in enumerate(fallback_steps, start=1):
                     directions.append(
                         {
@@ -1030,7 +949,7 @@ class LLMService:
         ai_response: str,
         from_weather: WeatherData,
         to_weather: WeatherData,
-    ) -> dict:
+    ) -> Dict[str, Any]:
         """Extract comprehensive route summary from AI response"""
         summary = {
             "from": from_weather.city,
@@ -1065,7 +984,7 @@ class LLMService:
 
         return summary
 
-    def _extract_traffic_info_from_ai(self, ai_response: str) -> dict:
+    def _extract_traffic_info_from_ai(self, ai_response: str) -> Dict[str, Any]:
         """Extract traffic conditions from AI response"""
         traffic_info = {"ai_analysis": True}
 
@@ -1230,21 +1149,23 @@ class LLMService:
     ) -> Dict[str, Any]:
         """Parse AI response for batch dispatch recommendations"""
         recommendations = []
-        
+
         try:
             # Extract recommendations section
-            recs_section = self._extract_section(ai_response, "DISPATCH RECOMMENDATIONS")
-            
+            recs_section = self._extract_section(
+                ai_response, "DISPATCH RECOMMENDATIONS"
+            )
+
             if recs_section:
                 # Parse each recommendation
                 rec_blocks = recs_section.split("\n\n")
                 for block in rec_blocks:
                     if not block.strip():
                         continue
-                    
+
                     rec = {}
                     lines = block.strip().split("\n")
-                    
+
                     for line in lines:
                         line = line.strip()
                         if line.startswith("Truck:"):
@@ -1256,19 +1177,25 @@ class LLMService:
                         elif line.startswith("Route:"):
                             rec["route_summary"] = line.replace("Route:", "").strip()
                         elif line.startswith("Total Distance:"):
-                            rec["total_distance"] = line.replace("Total Distance:", "").strip()
+                            rec["total_distance"] = line.replace(
+                                "Total Distance:", ""
+                            ).strip()
                         elif line.startswith("Estimated Duration:"):
-                            rec["estimated_duration"] = line.replace("Estimated Duration:", "").strip()
+                            rec["estimated_duration"] = line.replace(
+                                "Estimated Duration:", ""
+                            ).strip()
                         elif line.startswith("Total Fuel Delivery:"):
-                            rec["total_fuel_delivery"] = line.replace("Total Fuel Delivery:", "").strip()
+                            rec["total_fuel_delivery"] = line.replace(
+                                "Total Fuel Delivery:", ""
+                            ).strip()
                         elif line.startswith("Rationale:"):
                             rec["rationale"] = line.replace("Rationale:", "").strip()
-                    
+
                     if rec.get("truck_code"):
                         recommendations.append(rec)
         except Exception:
             self._logger.exception("Error parsing batch dispatch recommendations")
-        
+
         # Extract summary
         summary = ""
         try:
@@ -1277,7 +1204,7 @@ class LLMService:
                 summary = summary_section.strip()
         except Exception:
             pass
-        
+
         return {
             "recommendations": recommendations,
             "summary": summary or ai_response[:500],  # Fallback to first 500 chars
