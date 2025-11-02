@@ -1,22 +1,14 @@
-import { useState, useContext } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import LoginForm from "../components/auth/LoginForm";
 import RegisterForm from "../components/auth/RegisterForm";
-import { AuthContext } from "../contexts/AuthContext";
 
 export default function LoginPage() {
   const [showRegister, setShowRegister] = useState(false);
   const navigate = useNavigate();
-  const { register } = useContext(AuthContext);
-  const [error, setError] = useState(null);
 
-  const handleRegister = async ({ username, password, email }) => {
-    try {
-      await register(username, password, email);
-      navigate("/");
-    } catch (err) {
-      setError(err.message || "Registration failed");
-    }
+  const handleRegisterSuccess = () => {
+    navigate("/");
   };
 
   return (
@@ -24,8 +16,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md">
         {showRegister ? (
           <RegisterForm
-            onRegister={handleRegister}
-            error={error}
+            onSuccess={handleRegisterSuccess}
             onSwitchToLogin={() => setShowRegister(false)}
           />
         ) : (

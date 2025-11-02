@@ -43,13 +43,13 @@ const RegisterForm = ({ onSuccess, onSwitchToLogin }) => {
       formData.password
     );
 
+    setLoading(false);
+
     if (result.success) {
       if (onSuccess) onSuccess();
     } else {
       setError(result.error);
     }
-
-    setLoading(false);
   };
 
   return (
