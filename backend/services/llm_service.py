@@ -18,32 +18,83 @@ from models.data_models import (
 )
 from typing import Dict, Any, Optional, List
 import logging
-import re
 from utils.serializers import station_available_dict, truck_simple_dict
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from .lc_router import get_chat_model
 import os
+import asyncio
+import time
+import hashlib
 
 
 class LLMService:
     def __init__(self):
         self.prompt_service = PromptService()
         self._logger = logging.getLogger(__name__)
+        # Simple in-memory cache for expensive operations
+        self._weather_cache = {}
+        self._llm_cache = {}
+        self._cache_ttl = 300  # 5 minutes cache TTL
+
+        # Pre-compile regex patterns for better performance
+        self._script_regex = re.compile(r"(?i)<script.*?>.*?</script>", re.DOTALL)
+        self._directions_regex = re.compile(
+            r"(\d+)\.\s*(.*?)(?=\d+\.|$)", re.MULTILINE | re.DOTALL
+        )
+        self._section_regex = re.compile(
+            r"###\s*([^#\n]+?)\s*\n\s*(.*?)\s*(?=###|$)", re.DOTALL
+        )
+
+    def clear_cache(self):
+        """Clear all cached data - useful for debugging or forcing fresh API calls"""
+        self._weather_cache.clear()
+        self._llm_cache.clear()
+        self._logger.info("Cache cleared")
 
     def _extract_section(self, ai_response: str, section_name: str) -> str:
         """
-        Helper method to extract a section from AI response
-        Returns the content between section_name and next ### marker
+        Helper method to extract a section from AI response using simple string operations
+        Returns the content between section_name and next ### or ## marker
         """
-        if section_name not in ai_response:
+        try:
+            # Try with ### first (three hashes), then ## (two hashes)
+            for hash_count in ["###", "##"]:
+                section_marker = f"{hash_count} {section_name.upper()}"
+                if section_marker in ai_response:
+                    # Find the start of the section
+                    start_idx = ai_response.find(section_marker)
+                    if start_idx == -1:
+                        continue
+
+                    # Move past the section header
+                    content_start = start_idx + len(section_marker)
+                    # Skip any leading whitespace/newlines
+                    while (
+                        content_start < len(ai_response)
+                        and ai_response[content_start] in "\n\r\t "
+                    ):
+                        content_start += 1
+
+                    # Find the next section marker (try both ### and ##)
+                    next_section_markers = []
+                    for next_marker in ["### ", "## "]:  # Look for any next section
+                        marker_idx = ai_response.find(next_marker, content_start)
+                        if marker_idx != -1:
+                            next_section_markers.append(marker_idx)
+
+                    if next_section_markers:
+                        end_idx = min(next_section_markers)
+                    else:
+                        end_idx = len(ai_response)
+
+                    content = ai_response[content_start:end_idx].strip()
+                    return content
+
             return ""
 
-        section_content = ai_response.split(section_name)[1]
-        if "###" in section_content:
-            section_content = section_content.split("###")[0]
-
-        return section_content.strip()
+        except Exception:
+            return ""
 
     def _clean_markdown(self, text: str) -> str:
         """
@@ -96,8 +147,7 @@ class LLMService:
         from_location: str,
         to_location: str,
         session: AsyncSession,
-        # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
+        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "gemini-2.5-flash"),
         departure_time: Optional[str] = None,
         arrival_time: Optional[str] = None,
         time_mode: str = "departure",
@@ -128,7 +178,19 @@ class LLMService:
             notes=notes,
         )
 
-        ai_response = await self._call_llm(comprehensive_prompt, llm_model)
+        # Get AI analysis (with error handling to prevent route optimization failure)
+        ai_response = ""
+        try:
+            ai_response = await self._call_llm(comprehensive_prompt, llm_model)
+        except Exception as e:
+            self._logger.warning(
+                "LLM call failed for route optimization, continuing without AI analysis: %s",
+                e,
+            )
+            ai_response = (
+                "AI analysis unavailable due to service temporarily unavailable."
+            )
+
         # Debug: log ai response type/size for troubleshooting frontend display issues
         try:
             self._logger.debug(
@@ -152,7 +214,7 @@ class LLMService:
         depot_location: str,
         session: AsyncSession,
         # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
+        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "gemini-2.5-flash"),
     ) -> Dict[str, Any]:
         """Optimize dispatch route for a truck to deliver fuel to stations in need using SQLAlchemy 2.0"""
         try:
@@ -186,8 +248,19 @@ class LLMService:
                 depot_weather=depot_weather,
             )
 
-            # Get AI optimization
-            ai_response = await self._call_llm(prompt, llm_model)
+            # Get AI optimization (with error handling)
+            ai_response = ""
+            try:
+                ai_response = await self._call_llm(prompt, llm_model)
+            except Exception as e:
+                self._logger.warning(
+                    "LLM call failed for dispatch optimization, continuing without AI analysis: %s",
+                    e,
+                )
+                ai_response = (
+                    "AI analysis unavailable due to service temporarily unavailable."
+                )
+
             # Debug: log ai response type/size for troubleshooting frontend display issues
             try:
                 self._logger.debug(
@@ -271,8 +344,18 @@ class LLMService:
                 max_recommendations=max_recommendations,
             )
 
-            # Get AI recommendations
-            ai_response = await self._call_llm(prompt, llm_model)
+            # Get AI recommendations (with error handling)
+            ai_response = ""
+            try:
+                ai_response = await self._call_llm(prompt, llm_model)
+            except Exception as e:
+                self._logger.warning(
+                    "LLM call failed for dispatch recommendations, returning basic recommendations: %s",
+                    e,
+                )
+                ai_response = (
+                    "AI analysis unavailable due to service temporarily unavailable."
+                )
 
             # Parse and return recommendations
             result = self._parse_batch_dispatch_response(
@@ -295,107 +378,114 @@ class LLMService:
     async def _get_database_data_sqlalchemy(
         self, session: AsyncSession, from_location: str, to_location: str
     ) -> DatabaseResult:
-        """Query database using SQLAlchemy 2.0 and return standardized data models"""
+        """Query database using SQLAlchemy 2.0 with optimized parallel queries"""
         try:
-            # Get stations with fuel above minimum threshold
-            stations_stmt = (
-                select(Station)
-                .where(Station.current_level_liters > 1000)
-                .order_by(Station.capacity_liters.desc())
-                .limit(10)
-            )
-            stations_result = await session.execute(stations_stmt)
-            stations_orm = stations_result.scalars().all()
-            stations = [
-                StationData(
-                    id=station.id,
-                    code=station.code,
-                    name=station.name,
-                    lat=station.lat,
-                    lon=station.lon,
-                    city=station.city,
-                    region=station.region,
-                    fuel_type=station.fuel_type,
-                    capacity_liters=station.capacity_liters,
-                    current_level_liters=station.current_level_liters,
-                )
-                for station in stations_orm
-            ]
+            # Execute all three queries in parallel using asyncio.gather
 
-            # Get recent deliveries with location filtering
-            deliveries_stmt = (
-                select(
-                    Delivery.id,
-                    Delivery.volume_liters,
-                    Delivery.delivery_date,
-                    Delivery.status,
-                    Station.name.label("station_name"),
-                    Station.code.label("station_code"),
-                    Station.city,
-                    Station.region,
-                    Station.lat,
-                    Station.lon,
-                    Truck.code.label("truck_code"),
-                    Truck.plate.label("truck_plate"),
+            async def get_stations():
+                stations_stmt = (
+                    select(Station)
+                    .where(Station.current_level_liters > 1000)
+                    .order_by(Station.capacity_liters.desc())
+                    .limit(10)
                 )
-                .join(Station, Delivery.station_id == Station.id)
-                .join(Truck, Delivery.truck_id == Truck.id)
-                .where(
-                    and_(
-                        Delivery.delivery_date
-                        >= func.date_sub(func.now(), text("INTERVAL 30 DAY")),
-                        or_(
-                            Station.city.like(f"%{from_location}%"),
-                            Station.region.like(f"%{from_location}%"),
-                            Station.city.like(f"%{to_location}%"),
-                            Station.region.like(f"%{to_location}%"),
-                        ),
+                result = await session.execute(stations_stmt)
+                stations_orm = result.scalars().all()
+                return [
+                    StationData(
+                        id=station.id,
+                        code=station.code,
+                        name=station.name,
+                        lat=station.lat,
+                        lon=station.lon,
+                        city=station.city,
+                        region=station.region,
+                        fuel_type=station.fuel_type,
+                        capacity_liters=station.capacity_liters,
+                        current_level_liters=station.current_level_liters,
                     )
-                )
-                .order_by(Delivery.delivery_date.desc())
-                .limit(15)
-            )
-            deliveries_result = await session.execute(deliveries_stmt)
-            deliveries_raw = deliveries_result.all()
-            deliveries = [
-                DeliveryData(
-                    id=row.id,
-                    volume_liters=row.volume_liters,
-                    delivery_date=row.delivery_date,
-                    status=row.status,
-                    station_name=row.station_name,
-                    station_code=row.station_code,
-                    city=row.city,
-                    region=row.region,
-                    lat=row.lat,
-                    lon=row.lon,
-                    truck_code=row.truck_code,
-                    truck_plate=row.truck_plate,
-                )
-                for row in deliveries_raw
-            ]
+                    for station in stations_orm
+                ]
 
-            # Get active trucks
-            trucks_stmt = (
-                select(Truck)
-                .where(Truck.status == "active")
-                .order_by(Truck.capacity_liters.desc())
-                .limit(5)
-            )
-            trucks_result = await session.execute(trucks_stmt)
-            trucks_orm = trucks_result.scalars().all()
-            trucks = [
-                TruckData(
-                    id=truck.id,
-                    code=truck.code,
-                    plate=truck.plate,
-                    capacity_liters=truck.capacity_liters,
-                    fuel_level_percent=truck.fuel_level_percent,
-                    fuel_type=truck.fuel_type,
-                    status=truck.status,
+            async def get_deliveries():
+                deliveries_stmt = (
+                    select(
+                        Delivery.id,
+                        Delivery.volume_liters,
+                        Delivery.delivery_date,
+                        Delivery.status,
+                        Station.name.label("station_name"),
+                        Station.code.label("station_code"),
+                        Station.city,
+                        Station.region,
+                        Station.lat,
+                        Station.lon,
+                        Truck.code.label("truck_code"),
+                        Truck.plate.label("truck_plate"),
+                    )
+                    .join(Station, Delivery.station_id == Station.id)
+                    .join(Truck, Delivery.truck_id == Truck.id)
+                    .where(
+                        and_(
+                            Delivery.delivery_date
+                            >= func.date_sub(func.now(), text("INTERVAL 30 DAY")),
+                            or_(
+                                Station.city.like(f"%{from_location}%"),
+                                Station.region.like(f"%{from_location}%"),
+                                Station.city.like(f"%{to_location}%"),
+                                Station.region.like(f"%{to_location}%"),
+                            ),
+                        )
+                    )
+                    .order_by(Delivery.delivery_date.desc())
+                    .limit(15)
                 )
-                for truck in trucks_orm
-            ]
+                result = await session.execute(deliveries_stmt)
+                deliveries_raw = result.all()
+                return [
+                    DeliveryData(
+                        id=row.id,
+                        volume_liters=row.volume_liters,
+                        delivery_date=row.delivery_date,
+                        status=row.status,
+                        station_name=row.station_name,
+                        station_code=row.station_code,
+                        city=row.city,
+                        region=row.region,
+                        lat=row.lat,
+                        lon=row.lon,
+                        truck_code=row.truck_code,
+                        truck_plate=row.truck_plate,
+                    )
+                    for row in deliveries_raw
+                ]
+
+            async def get_trucks():
+                trucks_stmt = (
+                    select(Truck)
+                    .where(Truck.status == "active")
+                    .order_by(Truck.capacity_liters.desc())
+                    .limit(5)
+                )
+                result = await session.execute(trucks_stmt)
+                trucks_orm = result.scalars().all()
+                return [
+                    TruckData(
+                        id=truck.id,
+                        code=truck.code,
+                        plate=truck.plate,
+                        capacity_liters=truck.capacity_liters,
+                        fuel_level_percent=truck.fuel_level_percent,
+                        fuel_type=truck.fuel_type,
+                        status=truck.status,
+                    )
+                    for truck in trucks_orm
+                ]
+
+            # Execute all queries sequentially (SQLAlchemy doesn't allow concurrent operations on same session)
+            stations = await get_stations()
+            deliveries = await get_deliveries()
+            trucks = await get_trucks()
 
             return DatabaseResult(stations, deliveries, trucks)
 
@@ -406,11 +496,73 @@ class LLMService:
     async def _get_weather_data(
         self, from_location: str, to_location: str
     ) -> WeatherResult:
-        """Get weather data using standardized models (async)"""
+        """Get weather data using standardized models with caching and parallel fetching"""
+
         try:
-            from_weather = await get_weather_async(from_location)
-            to_weather = await get_weather_async(to_location)
+            # Check cache first
+            cache_key_from = f"weather_{from_location}"
+            cache_key_to = f"weather_{to_location}"
+
+            current_time = time.time()
+            from_weather = None
+            to_weather = None
+
+            # Get cached data if still valid
+            if (
+                cache_key_from in self._weather_cache
+                and current_time - self._weather_cache[cache_key_from]["timestamp"]
+                < self._cache_ttl
+            ):
+                from_weather = self._weather_cache[cache_key_from]["data"]
+
+            if (
+                cache_key_to in self._weather_cache
+                and current_time - self._weather_cache[cache_key_to]["timestamp"]
+                < self._cache_ttl
+            ):
+                to_weather = self._weather_cache[cache_key_to]["data"]
+
+            # Fetch missing weather data in parallel
+            tasks = []
+            if from_weather is None:
+                tasks.append(("from", get_weather_async(from_location)))
+            if to_weather is None:
+                tasks.append(("to", get_weather_async(to_location)))
+
+            if tasks:
+                results = await asyncio.gather(
+                    *[task[1] for task in tasks], return_exceptions=True
+                )
+
+                for (location_type, _), result in zip(tasks, results):
+                    if isinstance(result, Exception):
+                        # Use default weather on error
+                        weather_data = WeatherData(
+                            "Unknown" if location_type == "from" else to_location,
+                            20,
+                            "Clear",
+                            10,
+                            50,
+                        )
+                    else:
+                        weather_data = result
+
+                    # Cache the result
+                    cache_key = (
+                        cache_key_from if location_type == "from" else cache_key_to
+                    )
+                    self._weather_cache[cache_key] = {
+                        "data": weather_data,
+                        "timestamp": current_time,
+                    }
+
+                    if location_type == "from":
+                        from_weather = weather_data
+                    else:
+                        to_weather = weather_data
+
             return WeatherResult(from_weather, to_weather)
+
         except Exception as e:
             self._logger.exception("Weather data failed")
             # Return empty weather data
@@ -710,10 +862,30 @@ class LLMService:
 
     async def _call_llm(self, prompt: str, model_id: str) -> str:
         """
-        Generic async LLM call via LangChain with multi-provider support
+        Generic async LLM call via LangChain with multi-provider support and caching
         (OpenAI, Anthropic, or Google Gemini)
         """
+
         try:
+            # Create cache key from prompt and model
+            cache_key = hashlib.md5(f"{prompt}_{model_id}".encode()).hexdigest()
+            current_time = time.time()
+
+            # Check cache first
+            if (
+                cache_key in self._llm_cache
+                and current_time - self._llm_cache[cache_key]["timestamp"]
+                < self._cache_ttl
+                and self._llm_cache[cache_key][
+                    "data"
+                ]  # Ensure cached data is not empty
+            ):
+                self._logger.debug(
+                    "Using cached LLM response for key: %s", cache_key[:8]
+                )
+                return self._llm_cache[cache_key]["data"]
+
+            # Cache miss - make actual LLM call
             chat = get_chat_model(model_id, temperature=0.2)
 
             prompt_template = ChatPromptTemplate.from_template("{input}")
@@ -721,10 +893,30 @@ class LLMService:
 
             result = await chain.ainvoke({"input": prompt})
 
-            result = re.sub(r"(?i)<script.*?>.*?</script>", "", result, flags=re.DOTALL)
+            # Sanitize response
+            # Sanitize response using pre-compiled regex
+            result = self._script_regex.sub("", result)
             result = result.replace("<", "&lt;").replace(">", "&gt;")
+            result = result.strip()
 
-            return result.strip()
+            # Only cache non-empty results
+            if result:
+                self._llm_cache[cache_key] = {"data": result, "timestamp": current_time}
+
+                # Limit cache size to prevent memory issues
+                if len(self._llm_cache) > 100:
+                    # Remove oldest entries
+                    oldest_keys = sorted(
+                        self._llm_cache.keys(),
+                        key=lambda k: self._llm_cache[k]["timestamp"],
+                    )[
+                        :20
+                    ]  # Remove 20 oldest
+                    for key in oldest_keys:
+                        del self._llm_cache[key]
+
+            return result
+
         except Exception as e:
             self._logger.exception("LLM call failed: %s", e)
             raise Exception(f"LLM call failed: {e}")
@@ -739,6 +931,15 @@ class LLMService:
         time_mode: str = "departure",
     ) -> Dict[str, Any]:
         """Parse AI response using standardized data models"""
+
+        # DEBUG: Print AI response to see what we're getting
+        print(f"DEBUG: AI Response (first 500 chars): {ai_response[:500]}")
+        print(
+            f"DEBUG: AI Response contains 'ROUTE SUMMARY': {'ROUTE SUMMARY' in ai_response}"
+        )
+        print(
+            f"DEBUG: AI Response contains 'TURN-BY-TURN': {'TURN-BY-TURN' in ai_response}"
+        )
 
         # Extract parsed data
         try:
@@ -1150,23 +1351,63 @@ class LLMService:
         """Parse AI response for batch dispatch recommendations"""
         recommendations = []
 
+        print(f"\n{'='*80}")
+        print(f"DISPATCH PARSING DEBUG")
+        print(f"{'='*80}")
+        print(f"AI Response Length: {len(ai_response)}")
+        print(f"AI Response Preview (first 1000 chars):\n{ai_response[:1000]}")
+        print(f"{'='*80}\n")
+
+        self._logger.debug(
+            f"Parsing batch dispatch response, AI response length: {len(ai_response)}"
+        )
+        self._logger.debug(
+            f"AI response preview (first 500 chars): {ai_response[:500]}"
+        )
+
         try:
             # Extract recommendations section
             recs_section = self._extract_section(
                 ai_response, "DISPATCH RECOMMENDATIONS"
             )
 
+            print(
+                f"Extracted section length: {len(recs_section) if recs_section else 0}"
+            )
+            print(
+                f"Section preview: {recs_section[:500] if recs_section else 'NONE FOUND'}\n"
+            )
+
+            self._logger.debug(
+                f"Extracted recommendations section length: {len(recs_section) if recs_section else 0}"
+            )
+            self._logger.debug(
+                f"Recommendations section preview: {recs_section[:300] if recs_section else 'NONE'}"
+            )
+
             if recs_section:
-                # Parse each recommendation
-                rec_blocks = recs_section.split("\n\n")
-                for block in rec_blocks:
+                # Parse each recommendation block (starts with **Recommendation X:**)
+                rec_blocks = recs_section.split("**Recommendation ")
+                self._logger.debug(f"Split into {len(rec_blocks)} blocks")
+
+                for block in rec_blocks[1:]:  # Skip the first empty part
                     if not block.strip():
                         continue
 
                     rec = {}
                     lines = block.strip().split("\n")
+                    self._logger.debug(
+                        f"Processing block with {len(lines)} lines, first line: {lines[0] if lines else 'EMPTY'}"
+                    )
 
-                    for line in lines:
+                    # Extract recommendation number
+                    if lines and lines[0].strip().endswith(":**"):
+                        rec["recommendation_number"] = (
+                            lines[0].strip().replace(":**", "")
+                        )
+
+                    # Parse the rest of the fields
+                    for line in lines[1:]:
                         line = line.strip()
                         if line.startswith("Truck:"):
                             rec["truck_code"] = line.replace("Truck:", "").strip()
@@ -1193,8 +1434,20 @@ class LLMService:
 
                     if rec.get("truck_code"):
                         recommendations.append(rec)
+                        self._logger.debug(
+                            f"Added recommendation for truck: {rec.get('truck_code')}"
+                        )
+                    else:
+                        self._logger.warning(
+                            f"Skipped recommendation block without truck_code"
+                        )
+
         except Exception:
             self._logger.exception("Error parsing batch dispatch recommendations")
+
+        self._logger.info(
+            f"Parsed {len(recommendations)} recommendations from AI response"
+        )
 
         # Extract summary
         summary = ""

@@ -58,7 +58,6 @@ def get_chat_model(model_id: str, temperature: float = 0.3) -> BaseChatModel:
             model=name,
             temperature=temperature,
             api_key=config.GEMINI_API_KEY,
-            model_kwargs={"apiVersion": "v1"},
         )
 
     else:
