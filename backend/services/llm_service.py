@@ -18,32 +18,67 @@ from models.data_models import (
 )
 from typing import Dict, Any, Optional, List
 import logging
-import re
 from utils.serializers import station_available_dict, truck_simple_dict
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from .lc_router import get_chat_model
 import os
+import asyncio
+import time
+import hashlib
 
 
 class LLMService:
     def __init__(self):
         self.prompt_service = PromptService()
         self._logger = logging.getLogger(__name__)
+        # Simple in-memory cache for expensive operations
+        self._weather_cache = {}
+        self._llm_cache = {}
+        self._cache_ttl = 300  # 5 minutes cache TTL
+
+        # Pre-compile regex patterns for better performance
+        self._script_regex = re.compile(r"(?i)<script.*?>.*?</script>", re.DOTALL)
+        self._directions_regex = re.compile(
+            r"(\d+)\.\s*(.*?)(?=\d+\.|$)", re.MULTILINE | re.DOTALL
+        )
+        self._section_regex = re.compile(
+            r"###\s*([^#]+?)\s*###(.*?)(?=###|$)", re.DOTALL
+        )
 
     def _extract_section(self, ai_response: str, section_name: str) -> str:
         """
-        Helper method to extract a section from AI response
+        Helper method to extract a section from AI response using optimized regex
         Returns the content between section_name and next ### marker
         """
-        if section_name not in ai_response:
-            return ""
+        try:
+            # Use pre-compiled regex for better performance
+            matches = self._section_regex.findall(ai_response)
 
-        section_content = ai_response.split(section_name)[1]
-        if "###" in section_content:
-            section_content = section_content.split("###")[0]
+            for match in matches:
+                header, content = match
+                if section_name.lower() in header.lower():
+                    return content.strip()
 
-        return section_content.strip()
+            # Fallback to original method if regex doesn't match
+            if section_name not in ai_response:
+                return ""
+
+            section_content = ai_response.split(section_name)[1]
+            if "###" in section_content:
+                section_content = section_content.split("###")[0]
+
+            return section_content.strip()
+        except Exception:
+            # Fallback to original simple method
+            if section_name not in ai_response:
+                return ""
+
+            section_content = ai_response.split(section_name)[1]
+            if "###" in section_content:
+                section_content = section_content.split("###")[0]
+
+            return section_content.strip()
 
     def _clean_markdown(self, text: str) -> str:
         """
@@ -295,107 +330,114 @@ class LLMService:
     async def _get_database_data_sqlalchemy(
         self, session: AsyncSession, from_location: str, to_location: str
     ) -> DatabaseResult:
-        """Query database using SQLAlchemy 2.0 and return standardized data models"""
+        """Query database using SQLAlchemy 2.0 with optimized parallel queries"""
         try:
-            # Get stations with fuel above minimum threshold
-            stations_stmt = (
-                select(Station)
-                .where(Station.current_level_liters > 1000)
-                .order_by(Station.capacity_liters.desc())
-                .limit(10)
-            )
-            stations_result = await session.execute(stations_stmt)
-            stations_orm = stations_result.scalars().all()
-            stations = [
-                StationData(
-                    id=station.id,
-                    code=station.code,
-                    name=station.name,
-                    lat=station.lat,
-                    lon=station.lon,
-                    city=station.city,
-                    region=station.region,
-                    fuel_type=station.fuel_type,
-                    capacity_liters=station.capacity_liters,
-                    current_level_liters=station.current_level_liters,
-                )
-                for station in stations_orm
-            ]
+            # Execute all three queries in parallel using asyncio.gather
 
-            # Get recent deliveries with location filtering
-            deliveries_stmt = (
-                select(
-                    Delivery.id,
-                    Delivery.volume_liters,
-                    Delivery.delivery_date,
-                    Delivery.status,
-                    Station.name.label("station_name"),
-                    Station.code.label("station_code"),
-                    Station.city,
-                    Station.region,
-                    Station.lat,
-                    Station.lon,
-                    Truck.code.label("truck_code"),
-                    Truck.plate.label("truck_plate"),
+            async def get_stations():
+                stations_stmt = (
+                    select(Station)
+                    .where(Station.current_level_liters > 1000)
+                    .order_by(Station.capacity_liters.desc())
+                    .limit(10)
                 )
-                .join(Station, Delivery.station_id == Station.id)
-                .join(Truck, Delivery.truck_id == Truck.id)
-                .where(
-                    and_(
-                        Delivery.delivery_date
-                        >= func.date_sub(func.now(), text("INTERVAL 30 DAY")),
-                        or_(
-                            Station.city.like(f"%{from_location}%"),
-                            Station.region.like(f"%{from_location}%"),
-                            Station.city.like(f"%{to_location}%"),
-                            Station.region.like(f"%{to_location}%"),
-                        ),
+                result = await session.execute(stations_stmt)
+                stations_orm = result.scalars().all()
+                return [
+                    StationData(
+                        id=station.id,
+                        code=station.code,
+                        name=station.name,
+                        lat=station.lat,
+                        lon=station.lon,
+                        city=station.city,
+                        region=station.region,
+                        fuel_type=station.fuel_type,
+                        capacity_liters=station.capacity_liters,
+                        current_level_liters=station.current_level_liters,
                     )
-                )
-                .order_by(Delivery.delivery_date.desc())
-                .limit(15)
-            )
-            deliveries_result = await session.execute(deliveries_stmt)
-            deliveries_raw = deliveries_result.all()
-            deliveries = [
-                DeliveryData(
-                    id=row.id,
-                    volume_liters=row.volume_liters,
-                    delivery_date=row.delivery_date,
-                    status=row.status,
-                    station_name=row.station_name,
-                    station_code=row.station_code,
-                    city=row.city,
-                    region=row.region,
-                    lat=row.lat,
-                    lon=row.lon,
-                    truck_code=row.truck_code,
-                    truck_plate=row.truck_plate,
-                )
-                for row in deliveries_raw
-            ]
+                    for station in stations_orm
+                ]
 
-            # Get active trucks
-            trucks_stmt = (
-                select(Truck)
-                .where(Truck.status == "active")
-                .order_by(Truck.capacity_liters.desc())
-                .limit(5)
-            )
-            trucks_result = await session.execute(trucks_stmt)
-            trucks_orm = trucks_result.scalars().all()
-            trucks = [
-                TruckData(
-                    id=truck.id,
-                    code=truck.code,
-                    plate=truck.plate,
-                    capacity_liters=truck.capacity_liters,
-                    fuel_level_percent=truck.fuel_level_percent,
-                    fuel_type=truck.fuel_type,
-                    status=truck.status,
+            async def get_deliveries():
+                deliveries_stmt = (
+                    select(
+                        Delivery.id,
+                        Delivery.volume_liters,
+                        Delivery.delivery_date,
+                        Delivery.status,
+                        Station.name.label("station_name"),
+                        Station.code.label("station_code"),
+                        Station.city,
+                        Station.region,
+                        Station.lat,
+                        Station.lon,
+                        Truck.code.label("truck_code"),
+                        Truck.plate.label("truck_plate"),
+                    )
+                    .join(Station, Delivery.station_id == Station.id)
+                    .join(Truck, Delivery.truck_id == Truck.id)
+                    .where(
+                        and_(
+                            Delivery.delivery_date
+                            >= func.date_sub(func.now(), text("INTERVAL 30 DAY")),
+                            or_(
+                                Station.city.like(f"%{from_location}%"),
+                                Station.region.like(f"%{from_location}%"),
+                                Station.city.like(f"%{to_location}%"),
+                                Station.region.like(f"%{to_location}%"),
+                            ),
+                        )
+                    )
+                    .order_by(Delivery.delivery_date.desc())
+                    .limit(15)
                 )
-                for truck in trucks_orm
-            ]
+                result = await session.execute(deliveries_stmt)
+                deliveries_raw = result.all()
+                return [
+                    DeliveryData(
+                        id=row.id,
+                        volume_liters=row.volume_liters,
+                        delivery_date=row.delivery_date,
+                        status=row.status,
+                        station_name=row.station_name,
+                        station_code=row.station_code,
+                        city=row.city,
+                        region=row.region,
+                        lat=row.lat,
+                        lon=row.lon,
+                        truck_code=row.truck_code,
+                        truck_plate=row.truck_plate,
+                    )
+                    for row in deliveries_raw
+                ]
+
+            async def get_trucks():
+                trucks_stmt = (
+                    select(Truck)
+                    .where(Truck.status == "active")
+                    .order_by(Truck.capacity_liters.desc())
+                    .limit(5)
+                )
+                result = await session.execute(trucks_stmt)
+                trucks_orm = result.scalars().all()
+                return [
+                    TruckData(
+                        id=truck.id,
+                        code=truck.code,
+                        plate=truck.plate,
+                        capacity_liters=truck.capacity_liters,
+                        fuel_level_percent=truck.fuel_level_percent,
+                        fuel_type=truck.fuel_type,
+                        status=truck.status,
+                    )
+                    for truck in trucks_orm
+                ]
+
+            # Execute all queries concurrently
+            stations, deliveries, trucks = await asyncio.gather(
+                get_stations(), get_deliveries(), get_trucks()
+            )
 
             return DatabaseResult(stations, deliveries, trucks)
 
@@ -406,11 +448,73 @@ class LLMService:
     async def _get_weather_data(
         self, from_location: str, to_location: str
     ) -> WeatherResult:
-        """Get weather data using standardized models (async)"""
+        """Get weather data using standardized models with caching and parallel fetching"""
+
         try:
-            from_weather = await get_weather_async(from_location)
-            to_weather = await get_weather_async(to_location)
+            # Check cache first
+            cache_key_from = f"weather_{from_location}"
+            cache_key_to = f"weather_{to_location}"
+
+            current_time = time.time()
+            from_weather = None
+            to_weather = None
+
+            # Get cached data if still valid
+            if (
+                cache_key_from in self._weather_cache
+                and current_time - self._weather_cache[cache_key_from]["timestamp"]
+                < self._cache_ttl
+            ):
+                from_weather = self._weather_cache[cache_key_from]["data"]
+
+            if (
+                cache_key_to in self._weather_cache
+                and current_time - self._weather_cache[cache_key_to]["timestamp"]
+                < self._cache_ttl
+            ):
+                to_weather = self._weather_cache[cache_key_to]["data"]
+
+            # Fetch missing weather data in parallel
+            tasks = []
+            if from_weather is None:
+                tasks.append(("from", get_weather_async(from_location)))
+            if to_weather is None:
+                tasks.append(("to", get_weather_async(to_location)))
+
+            if tasks:
+                results = await asyncio.gather(
+                    *[task[1] for task in tasks], return_exceptions=True
+                )
+
+                for (location_type, _), result in zip(tasks, results):
+                    if isinstance(result, Exception):
+                        # Use default weather on error
+                        weather_data = WeatherData(
+                            "Unknown" if location_type == "from" else to_location,
+                            20,
+                            "Clear",
+                            10,
+                            50,
+                        )
+                    else:
+                        weather_data = result
+
+                    # Cache the result
+                    cache_key = (
+                        cache_key_from if location_type == "from" else cache_key_to
+                    )
+                    self._weather_cache[cache_key] = {
+                        "data": weather_data,
+                        "timestamp": current_time,
+                    }
+
+                    if location_type == "from":
+                        from_weather = weather_data
+                    else:
+                        to_weather = weather_data
+
             return WeatherResult(from_weather, to_weather)
+
         except Exception as e:
             self._logger.exception("Weather data failed")
             # Return empty weather data
@@ -710,10 +814,27 @@ class LLMService:
 
     async def _call_llm(self, prompt: str, model_id: str) -> str:
         """
-        Generic async LLM call via LangChain with multi-provider support
+        Generic async LLM call via LangChain with multi-provider support and caching
         (OpenAI, Anthropic, or Google Gemini)
         """
+
         try:
+            # Create cache key from prompt and model
+            cache_key = hashlib.md5(f"{prompt}_{model_id}".encode()).hexdigest()
+            current_time = time.time()
+
+            # Check cache first
+            if (
+                cache_key in self._llm_cache
+                and current_time - self._llm_cache[cache_key]["timestamp"]
+                < self._cache_ttl
+            ):
+                self._logger.debug(
+                    "Using cached LLM response for key: %s", cache_key[:8]
+                )
+                return self._llm_cache[cache_key]["data"]
+
+            # Cache miss - make actual LLM call
             chat = get_chat_model(model_id, temperature=0.2)
 
             prompt_template = ChatPromptTemplate.from_template("{input}")
@@ -721,10 +842,29 @@ class LLMService:
 
             result = await chain.ainvoke({"input": prompt})
 
-            result = re.sub(r"(?i)<script.*?>.*?</script>", "", result, flags=re.DOTALL)
+            # Sanitize response
+            # Sanitize response using pre-compiled regex
+            result = self._script_regex.sub("", result)
             result = result.replace("<", "&lt;").replace(">", "&gt;")
+            result = result.strip()
 
-            return result.strip()
+            # Cache the result
+            self._llm_cache[cache_key] = {"data": result, "timestamp": current_time}
+
+            # Limit cache size to prevent memory issues
+            if len(self._llm_cache) > 100:
+                # Remove oldest entries
+                oldest_keys = sorted(
+                    self._llm_cache.keys(),
+                    key=lambda k: self._llm_cache[k]["timestamp"],
+                )[
+                    :20
+                ]  # Remove 20 oldest
+                for key in oldest_keys:
+                    del self._llm_cache[key]
+
+            return result
+
         except Exception as e:
             self._logger.exception("LLM call failed: %s", e)
             raise Exception(f"LLM call failed: {e}")
