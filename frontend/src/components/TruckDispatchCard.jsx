@@ -1,8 +1,23 @@
-import { TruckIcon, WrenchScrewdriverIcon } from "@heroicons/react/24/outline";
+import {
+  TruckIcon,
+  WrenchScrewdriverIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  MapPinIcon,
+  CalendarIcon,
+  InformationCircleIcon,
+} from "@heroicons/react/24/outline";
 
 import { TRUCK_STATUS } from "../constants/config";
 
-function TruckDispatchCard({ truck, onOptimize, isOptimizing, disabled }) {
+function TruckDispatchCard({
+  truck,
+  onOptimize,
+  isOptimizing,
+  disabled,
+  isExpanded = false,
+  onToggleExpand,
+}) {
   const statusColor = {
     [TRUCK_STATUS.ACTIVE]: "bg-green-100 text-green-800",
     [TRUCK_STATUS.MAINTENANCE]: "bg-yellow-100 text-yellow-800",
@@ -108,51 +123,170 @@ function TruckDispatchCard({ truck, onOptimize, isOptimizing, disabled }) {
           </div>
         )}
 
-        {/* Action Button */}
-        <button
-          onClick={() => onOptimize(truck)}
-          disabled={
-            disabled || truck.status !== TRUCK_STATUS.ACTIVE || isOptimizing
-          }
-          className={`w-full px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-            truck.status === TRUCK_STATUS.ACTIVE && !disabled
-              ? "bg-blue-600 hover:bg-blue-700 text-white"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
-          }`}
-        >
-          {isOptimizing ? (
-            <span className="flex items-center justify-center">
-              <svg
-                className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Optimizing...
-            </span>
-          ) : truck.status === TRUCK_STATUS.MAINTENANCE ? (
-            <span className="flex items-center justify-center">
-              <WrenchScrewdriverIcon className="w-4 h-4 mr-2" />
-              Under Maintenance
-            </span>
-          ) : (
-            "Optimize Dispatch"
-          )}
-        </button>
+        {/* Expandable Details Section */}
+        {onToggleExpand && (
+          <div className="mb-4">
+            <button
+              onClick={onToggleExpand}
+              className="w-full flex items-center justify-between text-sm font-medium text-blue-600 hover:text-blue-700 py-2"
+            >
+              <span className="flex items-center space-x-1">
+                <InformationCircleIcon className="w-4 h-4" />
+                <span>{isExpanded ? "Hide" : "Show"} Details</span>
+              </span>
+              {isExpanded ? (
+                <ChevronUpIcon className="w-4 h-4" />
+              ) : (
+                <ChevronDownIcon className="w-4 h-4" />
+              )}
+            </button>
+
+            {isExpanded && (
+              <div className="mt-3 space-y-3 pt-3 border-t border-gray-200">
+                {/* Location */}
+                {truck.current_location && (
+                  <div className="flex items-start space-x-2">
+                    <MapPinIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div className="text-xs font-medium text-gray-700">
+                        Current Location
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        {truck.current_location}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Last Delivery */}
+                {truck.last_delivery_date && (
+                  <div className="flex items-start space-x-2">
+                    <CalendarIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div className="text-xs font-medium text-gray-700">
+                        Last Delivery
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        {new Date(
+                          truck.last_delivery_date
+                        ).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Capacity Details */}
+                <div className="grid grid-cols-2 gap-3 bg-blue-50 p-2 rounded">
+                  <div>
+                    <div className="text-xs font-medium text-gray-700">
+                      Total Capacity
+                    </div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      {truck.capacity_liters?.toLocaleString()} L
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-gray-700">
+                      Current Fuel
+                    </div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      {(
+                        (truck.capacity_liters * truck.fuel_level_percent) /
+                        100
+                      ).toLocaleString(undefined, {
+                        maximumFractionDigits: 0,
+                      })}{" "}
+                      L
+                    </div>
+                  </div>
+                </div>
+
+                {/* Compartment Summary */}
+                {truck.compartments && truck.compartments.length > 0 && (
+                  <div className="bg-gray-50 p-2 rounded">
+                    <div className="text-xs font-medium text-gray-700 mb-2">
+                      Compartment Details
+                    </div>
+                    <div className="space-y-1">
+                      {truck.compartments.map((comp) => {
+                        const utilization = (
+                          (comp.current_level_liters / comp.capacity_liters) *
+                          100
+                        ).toFixed(1);
+                        return (
+                          <div
+                            key={comp.compartment_number}
+                            className="flex justify-between items-center text-xs"
+                          >
+                            <span className="text-gray-600">
+                              #{comp.compartment_number} - {comp.fuel_type}
+                            </span>
+                            <span className="font-medium text-gray-900">
+                              {utilization}% filled
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Truck ID */}
+                <div className="text-xs text-gray-500 pt-2 border-t border-gray-200">
+                  <span className="font-medium">ID:</span> {truck.truck_id}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Action Button - Only show if onOptimize is provided */}
+        {onOptimize && (
+          <button
+            onClick={() => onOptimize(truck)}
+            disabled={
+              disabled || truck.status !== TRUCK_STATUS.ACTIVE || isOptimizing
+            }
+            className={`w-full px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
+              truck.status === TRUCK_STATUS.ACTIVE && !disabled
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
+          >
+            {isOptimizing ? (
+              <span className="flex items-center justify-center">
+                <svg
+                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Optimizing...
+              </span>
+            ) : truck.status === TRUCK_STATUS.MAINTENANCE ? (
+              <span className="flex items-center justify-center">
+                <WrenchScrewdriverIcon className="w-4 h-4 mr-2" />
+                Under Maintenance
+              </span>
+            ) : (
+              "Optimize Dispatch"
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

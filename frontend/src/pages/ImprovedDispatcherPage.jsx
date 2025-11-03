@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTrucks } from "../hooks/useTruckQueries";
 import { useStations } from "../hooks/useStationQueries";
 import {
@@ -11,6 +11,7 @@ import ErrorMessage from "../components/ErrorMessage";
 import AIErrorMessage from "../components/AIErrorMessage";
 import DispatchRecommendationCard from "../components/DispatchRecommendationCard";
 import DispatchResultCard from "../components/DispatchResultCard";
+import TruckDispatchCard from "../components/TruckDispatchCard";
 import PageLayout from "../components/PageLayout";
 import {
   SparklesIcon,
@@ -20,6 +21,8 @@ import {
   ExclamationTriangleIcon,
   FunnelIcon,
   XMarkIcon,
+  MagnifyingGlassIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import Api from "../services/api";
 import {
@@ -44,6 +47,14 @@ function ImprovedDispatcherPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [dispatchingRecommendation, setDispatchingRecommendation] =
     useState(null);
+
+  // Fleet management states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [fuelTypeFilter, setFuelTypeFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("code");
+  const [expandedTruckId, setExpandedTruckId] = useState(null);
+  const [showFleetFilters, setShowFleetFilters] = useState(false);
 
   // Fetch data using React Query
   const {
@@ -96,6 +107,48 @@ function ImprovedDispatcherPage() {
     (s) => s.fuel_level_percent >= 20 && s.fuel_level_percent < 30
   );
 
+  // Filtered and sorted trucks for fleet management
+  const filteredAndSortedTrucks = useMemo(() => {
+    let filtered = [...activeTrucks];
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (truck) =>
+          truck.code?.toLowerCase().includes(query) ||
+          truck.plate_number?.toLowerCase().includes(query) ||
+          truck.current_location?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((truck) => truck.status === statusFilter);
+    }
+
+    // Apply fuel type filter
+    if (fuelTypeFilter !== "all") {
+      filtered = filtered.filter((truck) => truck.fuel_type === fuelTypeFilter);
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "code":
+          return (a.code || "").localeCompare(b.code || "");
+        case "fuel_level":
+          return (b.fuel_level_percent || 0) - (a.fuel_level_percent || 0);
+        case "capacity":
+          return (b.total_capacity || 0) - (a.total_capacity || 0);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [activeTrucks, searchQuery, statusFilter, fuelTypeFilter, sortBy]);
+
   const isLoading = trucksLoading || stationsLoading;
   const error = trucksError || stationsError;
 
@@ -108,7 +161,7 @@ function ImprovedDispatcherPage() {
     setSelectedRecommendation(recommendation);
   };
 
-  const handleDispatchRecommendation = async (recommendation) => {
+  const handleDispatchRecommendation = (recommendation) => {
     setDispatchError(null);
     setDispatchingRecommendation(recommendation);
 
@@ -704,38 +757,121 @@ function ImprovedDispatcherPage() {
             </div>
           )}
 
-          {/* Available Trucks Summary */}
+          {/* Available Fleet - Enhanced */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-              <TruckIcon className="w-5 h-5 mr-2 text-blue-600" />
-              Available Fleet ({activeTrucks.length})
-            </h3>
-            <div className="space-y-3">
-              {activeTrucks.slice(0, 5).map((truck) => (
-                <div
-                  key={truck.truck_id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center">
+                <TruckIcon className="w-5 h-5 mr-2 text-blue-600" />
+                Available Fleet ({filteredAndSortedTrucks.length})
+              </h3>
+              <button
+                onClick={() => setShowFleetFilters(!showFleetFilters)}
+                className="flex items-center space-x-2 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <FunnelIcon className="w-4 h-4" />
+                <span>Filters</span>
+                <ChevronDownIcon
+                  className={`w-4 h-4 transition-transform ${
+                    showFleetFilters ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Search and Filter Controls */}
+            <div className="space-y-3 mb-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by code, plate, or location..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Filter Panel */}
+              {showFleetFilters && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-lg">
+                  {/* Status Filter */}
                   <div>
-                    <div className="font-medium text-gray-900">
-                      {truck.code}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {truck.plate_number}
-                    </div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="all">All Statuses</option>
+                      {Object.values(TRUCK_STATUS).map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-gray-900">
-                      {truck.fuel_level_percent}%
-                    </div>
-                    <div className="text-xs text-gray-500">fuel level</div>
+
+                  {/* Fuel Type Filter */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Fuel Type
+                    </label>
+                    <select
+                      value={fuelTypeFilter}
+                      onChange={(e) => setFuelTypeFilter(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="all">All Fuel Types</option>
+                      <option value="diesel">Diesel</option>
+                      <option value="regular">Regular</option>
+                      <option value="premium">Premium</option>
+                    </select>
+                  </div>
+
+                  {/* Sort By */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Sort By
+                    </label>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="code">Truck Code</option>
+                      <option value="fuel_level">Fuel Level</option>
+                      <option value="capacity">Total Capacity</option>
+                    </select>
                   </div>
                 </div>
-              ))}
-              {activeTrucks.length > 5 && (
-                <div className="text-sm text-gray-500 text-center">
-                  +{activeTrucks.length - 5} more trucks available
+              )}
+            </div>
+
+            {/* Truck List */}
+            <div className="space-y-3">
+              {filteredAndSortedTrucks.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <TruckIcon className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <p>No trucks found matching your criteria</p>
                 </div>
+              ) : (
+                filteredAndSortedTrucks.map((truck) => (
+                  <TruckDispatchCard
+                    key={truck.truck_id}
+                    truck={truck}
+                    isExpanded={expandedTruckId === truck.truck_id}
+                    onToggleExpand={() =>
+                      setExpandedTruckId(
+                        expandedTruckId === truck.truck_id
+                          ? null
+                          : truck.truck_id
+                      )
+                    }
+                  />
+                ))
               )}
             </div>
           </div>
