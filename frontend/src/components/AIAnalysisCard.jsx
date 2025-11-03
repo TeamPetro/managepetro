@@ -1,6 +1,13 @@
-import { SparklesIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
+import {
+  SparklesIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from "@heroicons/react/24/outline";
 import { useState } from "react";
 import { formatMarkdownForDisplay } from "../utils/textFormatting";
+import Card from "./Card";
+import StatusBadge from "./StatusBadge";
+import Icon from "./Icon";
 
 function AIAnalysisCard({ aiAnalysis, routeSummary }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -10,17 +17,17 @@ function AIAnalysisCard({ aiAnalysis, routeSummary }) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+    <Card>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
-          <SparklesIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500" />
+          <Icon size="lg">
+            <SparklesIcon className="text-yellow-500" />
+          </Icon>
           <h3 className="text-base sm:text-lg font-semibold text-gray-900">
             AI Route Analysis
           </h3>
         </div>
-        <span className="inline-flex items-center px-2 sm:px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-yellow-100 to-orange-100 text-orange-800">
-          AI Generated
-        </span>
+        <StatusBadge variant="ai">AI Generated</StatusBadge>
       </div>
 
       {/* Route Summary Info */}
@@ -91,12 +98,13 @@ function AIAnalysisCard({ aiAnalysis, routeSummary }) {
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {routeSummary.optimizationFactors.map((factor, index) => (
-                    <span
+                    <StatusBadge
                       key={index}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white text-gray-700 border border-gray-200"
+                      variant="outline"
+                      className="text-xs"
                     >
                       {factor}
-                    </span>
+                    </StatusBadge>
                   ))}
                 </div>
               </div>
@@ -113,9 +121,13 @@ function AIAnalysisCard({ aiAnalysis, routeSummary }) {
           >
             <span>Full AI Analysis</span>
             {isExpanded ? (
-              <ChevronUpIcon className="w-4 h-4 flex-shrink-0" />
+              <Icon>
+                <ChevronUpIcon />
+              </Icon>
             ) : (
-              <ChevronDownIcon className="w-4 h-4 flex-shrink-0" />
+              <Icon>
+                <ChevronDownIcon />
+              </Icon>
             )}
           </button>
 
@@ -128,7 +140,7 @@ function AIAnalysisCard({ aiAnalysis, routeSummary }) {
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 

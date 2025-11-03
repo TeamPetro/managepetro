@@ -72,6 +72,15 @@ class Config:
         )
         if not self.GEMINI_API_KEY:
             missing_vars.append("GEMINI_API_KEY (or gemenikey)")
+        
+        # OpenAI (optional)
+        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+
+        # Anthropic (optional)
+        self.ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
+
+        # DeepSeek (optional) – OpenAI-compatible API
+        self.DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 
         # Database Configuration (Required)
         self.DB_HOST = os.getenv("DB_HOST", "").strip()

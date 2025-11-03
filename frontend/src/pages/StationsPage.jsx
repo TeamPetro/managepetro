@@ -1,6 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import DynamicTable from "../components/DynamicTable";
-import { useStations } from "../hooks/useApiQueries";
+import PageLayout from "../components/PageLayout";
+import LoadingState from "../components/LoadingState";
+import { useStations } from "../hooks/useStationQueries";
 
 function StationsPage() {
   const { data, isPending, error } = useStations();
@@ -98,7 +100,7 @@ function StationsPage() {
   ];
 
   // Update filteredStations when stations change
-  useMemo(() => {
+  useEffect(() => {
     setFilteredStations(stations);
   }, [stations]);
 
@@ -108,126 +110,111 @@ function StationsPage() {
   };
 
   if (isPending) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-8 max-w-7xl">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-            <div className="flex items-center justify-center space-x-3">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              <span className="text-gray-600">Loading stations...</span>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
+    return <LoadingState message="Loading stations..." fullPage={true} />;
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-8 max-w-7xl">
-          <div className="bg-red-50 rounded-xl shadow-sm border border-red-200 p-8">
-            <div className="flex items-center justify-center space-x-3">
-              <span className="text-red-600 text-lg">⚠</span>
-              <span className="text-red-800">
-                {error.message || "Failed to load stations"}
-              </span>
-            </div>
+      <PageLayout background={true} fullHeight={true}>
+        <div className="bg-red-50 rounded-xl shadow-sm border border-red-200 p-8">
+          <div className="flex items-center justify-center space-x-3">
+            <span className="text-red-600 text-lg">⚠</span>
+            <span className="text-red-800">
+              {error.message || "Failed to load stations"}
+            </span>
           </div>
-        </main>
-      </div>
+        </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-8 max-w-7xl">
-        <div className="space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center justify-center">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <span className="text-blue-600 font-bold text-lg">⛽</span>
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-500">
-                      Total Stations
-                    </p>
-                    <p className="text-xl sm:text-2xl font-semibold text-gray-900">
-                      {stations.length}
-                    </p>
-                  </div>
+    <PageLayout background={true} fullHeight={true}>
+      <div className="space-y-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-center">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-blue-600 font-bold text-lg">⛽</span>
                 </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center justify-center">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <span className="text-red-600 font-bold text-lg">!</span>
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-500">
-                      High Priority Stations
-                    </p>
-                    <p className="text-xl sm:text-2xl font-semibold text-gray-900">
-                      {stations.filter((s) => s.priority === "High").length}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center justify-center">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <span className="text-yellow-600 font-bold text-lg">⚠</span>
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-500">
-                      Low Fuel Stations
-                    </p>
-                    <p className="text-xl sm:text-2xl font-semibold text-gray-900">
-                      {stations.filter((s) => s.fuel_level < 30).length}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center justify-center">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <span className="text-green-600 font-bold text-lg">✓</span>
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-500">
-                      Well Stocked Stations
-                    </p>
-                    <p className="text-xl sm:text-2xl font-semibold text-gray-900">
-                      {stations.filter((s) => s.fuel_level >= 70).length}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">
+                    Total Stations
+                  </p>
+                  <p className="text-xl sm:text-2xl font-semibold text-gray-900">
+                    {stations.length}
+                  </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Stations Table */}
-          <DynamicTable
-            data={filteredStations}
-            columns={columns}
-            onFilter={handleFilter}
-            showFilters={true}
-          />
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-center">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-red-600 font-bold text-lg">!</span>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">
+                    High Priority Stations
+                  </p>
+                  <p className="text-xl sm:text-2xl font-semibold text-gray-900">
+                    {stations.filter((s) => s.priority === "High").length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-center">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-yellow-600 font-bold text-lg">⚠</span>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">
+                    Low Fuel Stations
+                  </p>
+                  <p className="text-xl sm:text-2xl font-semibold text-gray-900">
+                    {stations.filter((s) => s.fuel_level < 30).length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center justify-center">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-green-600 font-bold text-lg">✓</span>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">
+                    Well Stocked Stations
+                  </p>
+                  <p className="text-xl sm:text-2xl font-semibold text-gray-900">
+                    {stations.filter((s) => s.fuel_level >= 70).length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </main>
-    </div>
+
+        {/* Stations Table */}
+        <DynamicTable
+          data={filteredStations}
+          columns={columns}
+          onFilter={handleFilter}
+          showFilters={true}
+        />
+      </div>
+    </PageLayout>
   );
 }
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
+import FormInput from "../FormInput";
 
 const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
   const [username, setUsername] = useState("");
@@ -37,41 +38,27 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label
-            htmlFor="username"
-            className="block text-xs sm:text-sm font-medium text-gray-700 mb-1"
-          >
-            Username or Email
-          </label>
-          <input
-            type="text"
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-            className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter your username or email"
-          />
-        </div>
+        <FormInput
+          label="Username or Email"
+          id="username"
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Enter your username or email"
+          required
+          disabled={loading}
+        />
 
-        <div>
-          <label
-            htmlFor="password"
-            className="block text-xs sm:text-sm font-medium text-gray-700 mb-1"
-          >
-            Password
-          </label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter your password"
-          />
-        </div>
+        <FormInput
+          label="Password"
+          id="password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Enter your password"
+          required
+          disabled={loading}
+        />
 
         <button
           type="submit"

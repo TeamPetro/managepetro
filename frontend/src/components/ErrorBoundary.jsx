@@ -1,4 +1,5 @@
 import React from "react";
+import { requireEnv } from "../config/env";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -68,7 +69,7 @@ class ErrorBoundary extends React.Component {
                 Try Again
               </button>
             </div>
-            {import.meta.env.DEV && this.state.error && (
+            {requireEnv("VITE_DEV", "true") === "true" && this.state.error && (
               <details className="mt-4 text-xs sm:text-sm">
                 <summary className="cursor-pointer text-gray-600 hover:text-gray-800">
                   Error Details (Development)

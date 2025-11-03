@@ -60,6 +60,10 @@ docker ps
 # To access your docker MySQL
 docker exec -it manage-petro-mysql mysql -ump_app -pdevpass manage_petro
 
+# To rebuild db after schema and/or seed script change
+cd backend
+python rebuild_db.py
+
 # To recreate schema on docker after schema changes (on Windows)
 Get-Content .\db\schema.sql | docker exec -i manage-petro-mysql mysql -ump_app -pdevpass manage_petro
 

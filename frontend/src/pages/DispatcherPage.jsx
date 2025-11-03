@@ -1,14 +1,14 @@
 import { useState, useMemo } from "react";
-import {
-  useTrucks,
-  useStations,
-  useOptimizeDispatch,
-} from "../hooks/useApiQueries";
-import LoadingSpinner from "../components/LoadingSpinner";
+import { useTrucks } from "../hooks/useTruckQueries";
+import { useStations } from "../hooks/useStationQueries";
+import { useOptimizeDispatch } from "../hooks/useDispatchQueries";
+import LoadingState from "../components/LoadingState";
 import ErrorMessage from "../components/ErrorMessage";
+import AIErrorMessage from "../components/AIErrorMessage";
 import TruckDispatchCard from "../components/TruckDispatchCard";
 import StationNeedsCard from "../components/StationNeedsCard";
 import DispatchResultCard from "../components/DispatchResultCard";
+import PageLayout from "../components/PageLayout";
 import {
   TruckIcon,
   MapPinIcon,
@@ -30,6 +30,7 @@ function DispatcherPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [depotLocation, setDepotLocation] = useState(DEFAULT_DEPOT_LOCATION);
   const [llmModel, setLlmModel] = useState(DEFAULT_LLM_MODEL);
+  const [dispatchError, setDispatchError] = useState(null);
 
   // Fetch data using React Query
   const {
@@ -59,6 +60,7 @@ function DispatcherPage() {
 
   const handleOptimizeDispatch = async (truck) => {
     setSelectedTruck(truck);
+    setDispatchError(null); // Clear any previous errors
 
     optimizeDispatchMutation.mutate(
       {
@@ -72,23 +74,20 @@ function DispatcherPage() {
           const transformedResult = Api.transformDispatchResponse(result);
           setDispatchResult(transformedResult);
         },
-        onError: () => {
+        onError: (error) => {
           setDispatchResult(null);
+          setDispatchError(error?.message || "AI dispatch optimization failed");
         },
       }
     );
   };
 
   if (isLoading) {
-    return (
-      <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-8">
-        <LoadingSpinner message="Loading dispatcher data..." />
-      </div>
-    );
+    return <LoadingState message="Loading dispatcher data..." />;
   }
 
   return (
-    <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-8">
+    <PageLayout>
       {/* Header */}
       <div className="mb-6 sm:mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -224,6 +223,19 @@ function DispatcherPage() {
 
         {/* Right Column: Stations or Dispatch Result */}
         <div>
+          {dispatchError && (
+            <div className="mb-4">
+              <AIErrorMessage
+                message={dispatchError}
+                context="dispatch"
+                onRetry={() =>
+                  selectedTruck && handleOptimizeDispatch(selectedTruck)
+                }
+                onDismiss={() => setDispatchError(null)}
+              />
+            </div>
+          )}
+
           {dispatchResult ? (
             <DispatchResultCard
               result={dispatchResult}
@@ -249,7 +261,7 @@ function DispatcherPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 }
 

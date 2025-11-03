@@ -1,5 +1,7 @@
 import { MapPinIcon, SignalIcon } from "@heroicons/react/24/outline";
 
+import { REQUEST_METHODS } from "../constants/config";
+
 function StationNeedsCard({ station }) {
   const fuelLevelColor = (level) => {
     if (level >= 50) return "text-green-600 bg-green-100";
@@ -8,7 +10,7 @@ function StationNeedsCard({ station }) {
   };
 
   const requestMethodBadge = (method) => {
-    if (method === "IoT") {
+    if (method === REQUEST_METHODS.IOT) {
       return (
         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
           <SignalIcon className="w-3 h-3 mr-1" />
@@ -24,7 +26,8 @@ function StationNeedsCard({ station }) {
   };
 
   const fuelNeeded = station.capacity_liters - station.current_level_liters;
-  const fuelPercent = station.fuel_level || 
+  const fuelPercent =
+    station.fuel_level ||
     Math.round((station.current_level_liters / station.capacity_liters) * 100);
 
   return (
@@ -37,7 +40,9 @@ function StationNeedsCard({ station }) {
               <MapPinIcon className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">{station.name}</h3>
+              <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">
+                {station.name}
+              </h3>
               <p className="text-xs sm:text-sm text-gray-500 truncate">
                 {station.city}, {station.region}
               </p>
@@ -50,7 +55,11 @@ function StationNeedsCard({ station }) {
         <div className="mb-3">
           <div className="flex justify-between text-xs sm:text-sm mb-1">
             <span className="text-gray-600">Fuel Level</span>
-            <span className={`font-semibold ${fuelLevelColor(fuelPercent).split(" ")[0]}`}>
+            <span
+              className={`font-semibold ${
+                fuelLevelColor(fuelPercent).split(" ")[0]
+              }`}
+            >
               {fuelPercent}%
             </span>
           </div>

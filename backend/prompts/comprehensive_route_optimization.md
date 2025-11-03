@@ -67,9 +67,13 @@ Recommended Arrival Time: [Time recommendation - if time_mode is 'departure', ca
 
 ### TURN-BY-TURN DIRECTIONS
 
-**CRITICAL: Provide ACCURATE, REAL turn-by-turn directions using actual road names and routes.**
+CRITICAL FORMAT REQUIREMENTS:
+- The heading must be exactly "### TURN-BY-TURN DIRECTIONS"
+- Each step must be numbered using "1.", "2.", "3.", etc.
+- Each step must have "Distance:" and "Duration:" on a new line immediately below the instruction.
+- Do not include bullet points, emojis, extra sections, or explanations.
 
-Use Google Maps or similar routing knowledge to provide precise directions. DO NOT make up road names.
+EXACT REQUIRED FORMAT:
 
 1. [Instruction text here]
    Distance: [X.X km] | Duration: [X min]

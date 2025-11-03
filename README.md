@@ -1,306 +1,397 @@
-# Manage Petro Setup Guide
+# Manage Petro - Quick Start Guide
 
-AI-powered fuel delivery management system with React frontend and Python backend.
+AI-powered fuel delivery management system with React frontend and Python FastAPI backend.
+
+---
 
 ## Prerequisites
 
-**⚠️ Install these first before continuing:**
+Install these before continuing:
 
-1. **Git** - Download from https://git-scm.com/downloads and install
-2. **Node.js 18+** - Download from https://nodejs.org and install (this includes npm)
-3. **Python 3.10+** - Download from https://python.org/downloads
-   - ⚠️ **IMPORTANT on Windows**: Check "Add Python to PATH" during installation
-4. **Docker Desktop** - Download from https://www.docker.com/products/docker-desktop
-   - After installing, restart your computer if prompted
-   - Open Docker Desktop and wait for it to fully start (you'll see a whale icon)
+1. **Node.js 18+** - https://nodejs.org (includes npm)
+2. **Python 3.10+** - https://python.org/downloads
+   - ⚠️ **Windows users**: Check "Add Python to PATH" during installation
+3. **Docker Desktop** - https://www.docker.com/products/docker-desktop
+   - Restart computer after installation
+   - Open Docker Desktop and wait for it to start (whale icon appears)
 
-**How to test if installed correctly:**
-
-- Open a terminal/command prompt and type: `git --version`, `node --version`, `python --version`
-- All should show version numbers (not error messages)
-
-## Step-by-Step Setup
-
-### Step 1: Download the Project
-
-**📍 Where to run:** Any folder on your computer
-
-1. **Open a terminal/command prompt:**
-
-   - Windows: Right-click in a folder → "Open in Terminal" or "Open PowerShell here"
-   - Mac: Right-click in Finder → "New Terminal at Folder"
-   - Linux: Right-click → "Open in Terminal"
-
-2. **Download the project:**
-   ```bash
-   git clone <repository-url>
-   cd "ISSP Project"
-   ```
-
-### Step 2: Start the Database
-
-**📍 Where to run:** Navigate to the backend folder first
-
-1. **Navigate to backend folder:**
-   ```bash
-   cd backend
-   ```
-2. **Make sure Docker Desktop is running** (check for whale icon in system tray)
-
-3. **Start the database:**
-   ```bash
-   docker compose up -d
-   ```
-   **What this does:** Downloads and starts a MySQL database with sample data
-   **First time:** Takes 3-5 minutes to download
-   **Success:** You should see "Container manage-petro-mysql Started"
-
-### Step 3: Get Your API Keys (Free!)
-
-**📍 Where to run:** Make sure you're in the backend folder (run `cd backend` if needed)
-
-1. **Copy the template file:**
-
-   ```bash
-   # Windows users:
-   copy .env.example .env
-
-   # Mac/Linux users:
-   cp .env.example .env
-   ```
-
-2. **Get your free API keys:**
-
-3. **Edit the .env file:**
-   - Open the `.env` file in any text editor (Notepad, VS Code, etc.)
-   - Replace `your_key_here` with your actual API keys:
-   ```env
-   WEATHER_API_KEY=paste_weather_key_here
-   TOMTOM_API_KEY=paste_tomtom_key_here
-   GEMINI_API_KEY=paste_gemini_key_here
-   ```
-   - Save the file
-
-### Step 4: Setup Backend (Python)
-
-**📍 Where to run:** Make sure you're in the backend folder (run `cd backend` if needed)
+**Verify installation:**
 
 ```bash
+node --version
+python --version
+docker --version
+```
+
+---
+
+## Setup (First Time Only)
+
+### 1. Get API Keys (Free)
+
+You need three free API keys:
+
+- **Weather API**: https://www.weatherapi.com → Sign up → Get key
+- **TomTom Maps**: https://developer.tomtom.com → Sign up → Get key
+- **Google Gemini**: https://makersuite.google.com/app/apikey → Sign in → Create key
+
+### 2. Configure Backend
+
+```bash
+cd backend
+
+# Copy environment template
+# Windows:
+copy .env.example .env
+# Mac/Linux:
+cp .env.example .env
+
+# Edit .env file and paste your API keys:
+# WEATHER_API_KEY=your_weather_key_here
+# TOMTOM_API_KEY=your_tomtom_key_here
+# GEMINI_API_KEY=your_gemini_key_here
+
+# Install Python dependencies
 pip install -r requirements.txt
 ```
 
-**What this does:** Downloads all Python packages the app needs
-**Success:** You should see "Successfully installed..." messages
-
-### Step 5: Setup Frontend (React)
-
-**📍 Where to run:** Navigate to the frontend folder
-
-1. **Go back to project root, then to frontend:**
-
-   ```bash
-   cd ..          # Go back to "ISSP Project" folder
-   cd frontend    # Go into frontend folder
-   ```
-
-2. **Install frontend packages:**
-   ```bash
-   npm install
-   ```
-   **What this does:** Downloads all React components and tools
-   **Success:** You should see a folder called "node_modules" created
-
-## Running the Complete App
-
-**⚠️ You need 3 separate terminals/command prompts open at the same time!**
-
-### Terminal 1: Database
-
-**📍 Where to run:** Open a terminal and navigate to the backend folder
+### 3. Configure Frontend
 
 ```bash
-cd "ISSP Project"             # Navigate to your project folder first
-cd backend                    # Then go into backend folder
-docker compose up -d         # Starts database in background
-```
+cd ../frontend
 
-**Success:** Shows "Container manage-petro-mysql Started"
+# Copy environment template
+# Windows:
+copy .env.example .env
+# Mac/Linux:
+cp .env.example .env
 
-### Terminal 2: Backend Server
+# Edit .env file (usually the defaults work):
+# VITE_API_BASE_URL=http://localhost:8000
+# VITE_DEFAULT_LLM_MODEL=gemini-2.5-flash
 
-**📍 Where to run:** Open a NEW terminal and navigate to the backend folder
-
-```bash
-cd "ISSP Project"             # Navigate to your project folder first
-cd backend                    # Then go into backend folder
-fastapi dev main.py          # Starts Python server
-```
-
-**Success:** Shows "Uvicorn running on http://127.0.0.1:8000"
-**⚠️ Keep this terminal open!** Don't close it or the backend stops.
-
-### Terminal 3: Frontend App
-
-**📍 Where to run:** Open a THIRD terminal and navigate to the frontend folder
-
-```bash
-cd "ISSP Project"             # Navigate to your project folder first
-cd frontend                   # Then go into frontend folder
-npm run dev                   # Starts React app
-```
-
-**Success:** Shows "Local: http://localhost:3000/"
-**⚠️ Keep this terminal open too!** Don't close it or the frontend stops.
-
-### Open Your Browser
-
-Go to: **http://localhost:3000**
-
-You should see the Manage Petro application! 🎉
-
-## Important URLs (Bookmark These)
-
-- **Main App**: http://localhost:3000 ← This is where you work
-- **API Server**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs ← Great for testing
-
-## Troubleshooting Common Problems
-
-### "Docker compose command not found" or database won't start
-
-**📍 Navigate to backend folder first:**
-
-```bash
-cd "ISSP Project"       # Go to your project folder
-cd backend              # Then go into backend folder
-docker compose down    # Stop any running database
-docker compose up -d   # Start fresh
-```
-
-**If still broken:** Make sure Docker Desktop is running (whale icon visible)
-
-### "ModuleNotFoundError" or "pip not found"
-
-**📍 Navigate to backend folder first:**
-
-```bash
-cd "ISSP Project"                # Go to your project folder
-cd backend                       # Then go into backend folder
-pip install -r requirements.txt
-```
-
-**If pip not found:** Python wasn't installed correctly or not added to PATH
-
-### "npm not found" or frontend errors
-
-**📍 Navigate to frontend folder first:**
-
-```bash
-cd "ISSP Project"        # Go to your project folder
-cd frontend              # Then go into frontend folder
+# Install npm dependencies
 npm install
 ```
 
-**If npm not found:** Node.js wasn't installed correctly
+---
 
-### "Port already in use" errors
+## Running the App
 
-**Problem:** Another app is using the same port
-**Solution:**
+**You need 3 terminals open simultaneously:**
 
-- Close other development servers, React apps, or Python servers
-- Or restart your computer to clear all ports
-
-### API key errors or "Unauthorized"
-
-**Problem:** Your `.env` file has wrong or missing API keys
-**📍 Check:** Open `backend/.env` file and verify:
-
-- All three API keys are filled in (no "your_key_here" left)
-- No extra spaces or quotes around the keys
-- File is saved
-
-### Nothing works / "I'm completely lost"
-
-**📍 Nuclear option - navigate to backend folder and start completely over:**
+### Terminal 1: Database (Docker)
 
 ```bash
-cd "ISSP Project"              # Go to your project folder
-cd backend                     # Then go into backend folder
-docker compose down -v        # Delete everything
-docker compose up -d          # Start fresh with new data
+cd backend
+docker compose up -d
+```
+
+✅ Success: Shows "Container manage-petro-mysql Started"
+
+### Terminal 2: Backend Server
+
+```bash
+cd backend
+fastapi dev main.py
+```
+
+✅ Success: Shows "Uvicorn running on http://127.0.0.1:8000"
+⚠️ Keep this terminal open!
+
+### Terminal 3: Frontend App
+
+```bash
+cd frontend
+npm run dev
+```
+
+✅ Success: Shows "Local: http://localhost:3000/"
+⚠️ Keep this terminal open!
+
+### Access the App
+
+Open your browser: **http://localhost:3000**
+
+---
+
+## Docker Commands
+
+All Docker commands must be run from the `backend` folder.
+
+```bash
+cd backend
+
+# Start database (run every morning)
+docker compose up -d
+
+# Stop database (keeps your data)
+docker compose down
+
+# Delete everything and start fresh
+docker compose down -v
+docker compose up -d
+
+# Check if database is running
+docker ps
+# Look for "manage-petro-mysql" in the list
+
+# Access MySQL console
+docker exec -it manage-petro-mysql mysql -ump_app -pdevpass manage_petro
+
+# Rebuild database after schema changes
+python rebuild_db.py
+
+# Manual schema reload (Windows PowerShell)
+Get-Content .\db\schema.sql | docker exec -i manage-petro-mysql mysql -ump_app -pdevpass manage_petro
+
+# Manual seed data reload (Windows PowerShell)
+Get-Content .\db\seed.sql | docker exec -i manage-petro-mysql mysql -ump_app -pdevpass manage_petro
+```
+
+---
+
+## Troubleshooting
+
+### Database won't start
+
+```bash
+cd backend
+docker compose down
+docker compose up -d
+docker ps  # Verify it's running
+```
+
+Make sure Docker Desktop is running (whale icon visible).
+
+### Backend errors
+
+```bash
+cd backend
 pip install -r requirements.txt
 ```
 
-Then try the frontend setup again.
-
-## Project Structure
-
-```
-ISSP Project/
-├── backend/           # Python FastAPI + MySQL
-│   ├── main.py       # API server
-│   ├── .env          # Your API keys (create this)
-│   └── services/     # AI & business logic
-└── frontend/         # React app
-    ├── src/          # Components & pages
-    └── package.json  # Dependencies
-```
-
-## Daily Development Workflow (For Making Changes)
-
-**📍 Navigate to your main "ISSP Project" folder first, then run these commands**
-
-### Before You Start Working Each Day:
+### Frontend errors
 
 ```bash
-cd "ISSP Project"              # Navigate to your project folder
-git checkout devmain           # Switch to main branch
-git pull origin devmain        # Get latest changes from team
+cd frontend
+npm install
 ```
 
-### When Starting a New Feature:
+### Port already in use
+
+Close other terminals running Python/React servers, or restart your computer.
+
+### API key errors
+
+1. Check `backend/.env` file exists
+2. Verify all three API keys are filled in
+3. No quotes or extra spaces around keys
+4. Restart the backend server
+
+### Complete reset
 
 ```bash
-git checkout -b feature/describe-your-feature    # Create your branch
-# Example: git checkout -b feature/fix-login-button
+cd backend
+docker compose down -v
+pip install -r requirements.txt
+docker compose up -d
+fastapi dev main.py
+
+# In another terminal:
+cd frontend
+npm install
+npm run dev
 ```
 
-### When You're Done Making Changes:
+---
+
+## Quick Reference
+
+### Important URLs
+
+- **App**: http://localhost:3000
+- **API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+
+### Project Structure
+
+```
+├── backend/              # Python FastAPI + MySQL
+│   ├── main.py          # API server
+│   ├── .env             # Your API keys
+│   ├── docker-compose.yml
+│   └── requirements.txt
+└── frontend/            # React app
+    ├── src/
+    ├── .env             # Frontend config
+    └── package.json
+```
+
+### Daily Workflow
+
+**Every morning:**
+
+1. Start Docker Desktop
+2. Open 3 terminals
+3. Run database, backend, frontend (in that order)
+4. Go to http://localhost:3000
+
+**When done working:**
+
+- Close terminals (Ctrl+C)
+- Database keeps running in background
+- Run `docker compose down` to stop database
+
+---
+
+## GitHub Workflow (Making Changes)
+
+### First Time Setup
 
 ```bash
-git add .                                        # Add all your changes
-git commit -m "feat: describe what you did"     # Save with message
-git push origin feature/your-branch-name        # Send to GitHub
+# Clone the project (only do this once)
+git clone <repository-url>
+cd "ISSP Project"
 ```
 
-Then create a Pull Request on GitHub to merge into `devmain`
+### Every Day Before You Start Working
 
-### Branch Names We Use:
+```bash
+# Make sure you're on the main branch
+git checkout devmain
 
-- `devmain` - Main development branch (never commit directly here!)
-- `feature/something` - New features you're building
-- `fix/something` - Bug fixes
-- `main` - Production releases (don't touch this)
+# Get the latest changes from your team
+git pull origin devmain
+```
 
-## ⚠️ Important Daily Reminders
+✅ Success: Shows "Already up to date" or downloads new changes
 
-### Every Day Before You Start:
+### Starting a New Feature or Fix
 
-1. **Check Docker Desktop is running** (whale icon visible)
-2. **Open your 3 terminals** for database, backend, frontend
-3. **Pull latest changes** with `git pull origin devmain`
-4. **Start all services** in the right folders
+```bash
+# Create a new branch for your work
+git checkout -b feature/describe-what-youre-doing
 
-### While Developing:
+# Examples:
+# git checkout -b feature/add-login-button
+# git checkout -b fix/broken-map-display
+```
 
-- **Don't close your terminals** - the app stops working
-- **Save your work often** - commit every hour or so
-- **Test your changes** at http://localhost:3000 before committing
+⚠️ **Branch naming:**
 
-### Getting Help:
+- Use `feature/` for new features
+- Use `fix/` for bug fixes
+- Keep names short and descriptive
 
-- **Error messages?** Copy the full error and ask someone
-- **Can't find a command?** Make sure you're in the right folder
-- **App not loading?** Check all 3 terminals are still running
-- **Completely stuck?** Ask a team member for help
+### Saving Your Work
+
+```bash
+# Check what you changed
+git status
+
+# Add all your changes
+git add .
+
+# Save with a message describing what you did
+git commit -m "describe your changes here"
+
+# Examples:
+# git commit -m "add login button to homepage"
+# git commit -m "fix map not loading on stations page"
+```
+
+**Commit messages should:**
+
+- Start with a verb (add, fix, update, remove)
+- Be short (under 50 characters)
+- Describe WHAT you did, not how
+
+### Sharing Your Work (Push to GitHub)
+
+```bash
+# Send your branch to GitHub
+git push origin feature/your-branch-name
+
+# Example:
+# git push origin feature/add-login-button
+```
+
+✅ Success: Shows a URL to create a Pull Request
+
+### Creating a Pull Request (PR)
+
+1. Go to GitHub in your browser
+2. You'll see a yellow banner saying "Compare & pull request" - click it
+3. Fill in:
+   - **Title**: What you did (e.g., "Add login button")
+   - **Description**: Why and any details
+4. Make sure it says: `devmain ← your-branch-name`
+5. Click "Create pull request"
+
+⚠️ **DO NOT merge your own PR!** Wait for a team member to review it.
+
+### After Your PR is Merged
+
+```bash
+# Switch back to main branch
+git checkout devmain
+
+# Get your merged changes
+git pull origin devmain
+
+# Delete your old branch (cleanup)
+git branch -d feature/your-branch-name
+```
+
+### Common Mistakes & Fixes
+
+**"I forgot to create a branch and worked on devmain!"**
+
+```bash
+# Create a branch with your current changes
+git checkout -b feature/my-forgot-branch
+
+# Your changes are now on the new branch
+git push origin feature/my-forgot-branch
+```
+
+**"I have merge conflicts!"**
+
+```bash
+# Get the latest devmain changes
+git checkout devmain
+git pull origin devmain
+
+# Try to merge into your branch
+git checkout feature/your-branch
+git merge devmain
+
+# VS Code will show conflicts - fix them manually
+# Then:
+git add .
+git commit -m "resolve merge conflicts"
+git push origin feature/your-branch
+```
+
+**"I need to start over!"**
+
+```bash
+# Throw away all your changes (BE CAREFUL!)
+git checkout devmain
+git reset --hard origin/devmain
+
+# Or just switch to devmain and start a new branch
+git checkout devmain
+git pull origin devmain
+git checkout -b feature/new-attempt
+```
+
+### Simple Rules
+
+1. ✅ **ALWAYS** work on a branch (never on `devmain` directly)
+2. ✅ **ALWAYS** pull before starting new work
+3. ✅ **ALWAYS** commit frequently (every hour or when something works)
+4. ❌ **NEVER** force push (`git push -f`)
+5. ❌ **NEVER** commit directly to `devmain`
+6. ❌ **NEVER** merge your own Pull Request

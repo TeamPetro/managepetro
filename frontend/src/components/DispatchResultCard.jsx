@@ -1,8 +1,17 @@
 import { XMarkIcon, TruckIcon, MapIcon } from "@heroicons/react/24/outline";
+
 import { formatMarkdownForDisplay } from "../utils/textFormatting";
+import { REQUEST_METHODS } from "../constants/config";
 
 function DispatchResultCard({ result, onClose }) {
-  const { dispatch_summary, truck, route_stops, ai_analysis, stations_available } = result;
+  const {
+    dispatch_summary,
+    truck,
+    route_stops,
+    ai_analysis,
+    stations_available,
+    depot_location,
+  } = result;
 
   return (
     <div className="bg-white rounded-lg shadow-lg border-2 border-blue-500">
@@ -12,9 +21,12 @@ function DispatchResultCard({ result, onClose }) {
           <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
             <TruckIcon className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
             <div className="min-w-0">
-              <h2 className="text-base sm:text-xl font-bold truncate">Dispatch Optimization Result</h2>
+              <h2 className="text-base sm:text-xl font-bold truncate">
+                Dispatch Optimization Result
+              </h2>
               <p className="text-xs sm:text-sm text-blue-100 truncate">
                 {truck.code} - {truck.plate}
+                {depot_location && ` • Depot: ${depot_location}`}
               </p>
             </div>
           </div>
@@ -37,46 +49,65 @@ function DispatchResultCard({ result, onClose }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {dispatch_summary.total_stations && (
                 <div className="bg-blue-50 p-2 sm:p-3 rounded-lg">
-                  <div className="text-xs sm:text-sm text-gray-600">Stations to Visit</div>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Stations to Visit
+                  </div>
                   <div className="text-lg sm:text-xl font-bold text-blue-600">
-                    {formatMarkdownForDisplay(String(dispatch_summary.total_stations))}
+                    {formatMarkdownForDisplay(
+                      String(dispatch_summary.total_stations)
+                    )}
                   </div>
                 </div>
               )}
               {dispatch_summary.total_distance && (
                 <div className="bg-green-50 p-2 sm:p-3 rounded-lg">
-                  <div className="text-xs sm:text-sm text-gray-600">Total Distance</div>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Total Distance
+                  </div>
                   <div className="text-lg sm:text-xl font-bold text-green-600">
-                    {formatMarkdownForDisplay(String(dispatch_summary.total_distance))}
+                    {formatMarkdownForDisplay(
+                      String(dispatch_summary.total_distance)
+                    )}
                   </div>
                 </div>
               )}
               {dispatch_summary.estimated_duration && (
                 <div className="bg-purple-50 p-2 sm:p-3 rounded-lg">
-                  <div className="text-xs sm:text-sm text-gray-600">Estimated Duration</div>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Estimated Duration
+                  </div>
                   <div className="text-lg sm:text-xl font-bold text-purple-600">
-                    {formatMarkdownForDisplay(String(dispatch_summary.estimated_duration))}
+                    {formatMarkdownForDisplay(
+                      String(dispatch_summary.estimated_duration)
+                    )}
                   </div>
                 </div>
               )}
               {dispatch_summary.total_fuel && (
                 <div className="bg-orange-50 p-2 sm:p-3 rounded-lg">
-                  <div className="text-xs sm:text-sm text-gray-600">Total Fuel Delivery</div>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Total Fuel Delivery
+                  </div>
                   <div className="text-lg sm:text-xl font-bold text-orange-600">
-                    {formatMarkdownForDisplay(String(dispatch_summary.total_fuel))}
+                    {formatMarkdownForDisplay(
+                      String(dispatch_summary.total_fuel)
+                    )}
                   </div>
                 </div>
               )}
             </div>
 
             {/* Timing */}
-            {(dispatch_summary.departure_time || dispatch_summary.return_time) && (
+            {(dispatch_summary.departure_time ||
+              dispatch_summary.return_time) && (
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
                 {dispatch_summary.departure_time && (
                   <div>
                     <span className="text-gray-600">Departure Time:</span>
                     <span className="ml-2 font-medium text-gray-900">
-                      {formatMarkdownForDisplay(String(dispatch_summary.departure_time))}
+                      {formatMarkdownForDisplay(
+                        String(dispatch_summary.departure_time)
+                      )}
                     </span>
                   </div>
                 )}
@@ -84,7 +115,9 @@ function DispatchResultCard({ result, onClose }) {
                   <div>
                     <span className="text-gray-600">Return to Depot:</span>
                     <span className="ml-2 font-medium text-gray-900">
-                      {formatMarkdownForDisplay(String(dispatch_summary.return_time))}
+                      {formatMarkdownForDisplay(
+                        String(dispatch_summary.return_time)
+                      )}
                     </span>
                   </div>
                 )}
@@ -118,27 +151,37 @@ function DispatchResultCard({ result, onClose }) {
                         {stop.distance && (
                           <div>
                             <span className="text-gray-600">Distance:</span>
-                            <span className="ml-2 text-gray-900">{formatMarkdownForDisplay(String(stop.distance))}</span>
+                            <span className="ml-2 text-gray-900">
+                              {formatMarkdownForDisplay(String(stop.distance))}
+                            </span>
                           </div>
                         )}
                         {stop.fuel_delivery && (
                           <div>
-                            <span className="text-gray-600">Fuel to Deliver:</span>
+                            <span className="text-gray-600">
+                              Fuel to Deliver:
+                            </span>
                             <span className="ml-2 font-medium text-blue-600">
-                              {formatMarkdownForDisplay(String(stop.fuel_delivery))}
+                              {formatMarkdownForDisplay(
+                                String(stop.fuel_delivery)
+                              )}
                             </span>
                           </div>
                         )}
                         {stop.eta && (
                           <div>
                             <span className="text-gray-600">ETA:</span>
-                            <span className="ml-2 text-gray-900">{formatMarkdownForDisplay(String(stop.eta))}</span>
+                            <span className="ml-2 text-gray-900">
+                              {formatMarkdownForDisplay(String(stop.eta))}
+                            </span>
                           </div>
                         )}
                         {stop.reason && (
                           <div>
                             <span className="text-gray-600">Reason:</span>
-                            <span className="ml-2 text-gray-700">{formatMarkdownForDisplay(String(stop.reason))}</span>
+                            <span className="ml-2 text-gray-700">
+                              {formatMarkdownForDisplay(String(stop.reason))}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -187,7 +230,8 @@ function DispatchResultCard({ result, onClose }) {
             </h3>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
               <p className="text-xs sm:text-sm text-gray-700 mb-2">
-                All stations needing fuel that were considered for this dispatch:
+                All stations needing fuel that were considered for this
+                dispatch:
               </p>
               <div className="max-h-48 overflow-y-auto space-y-2">
                 {stations_available.map((station) => (
@@ -199,8 +243,10 @@ function DispatchResultCard({ result, onClose }) {
                       {station.name} - {station.city}
                     </div>
                     <div className="text-gray-600 mt-1 truncate">
-                      {station.fuel_type} • {station.fuel_level_percent}% full • 
-                      {station.request_method === "IoT" ? " Auto-Request" : " Manual"}
+                      {station.fuel_type} • {station.fuel_level_percent}% full •
+                      {station.request_method === REQUEST_METHODS.IOT
+                        ? " Auto-Request"
+                        : " Manual"}
                     </div>
                   </div>
                 ))}

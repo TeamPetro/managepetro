@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
+import FormInput from "../FormInput";
 
 const RegisterForm = ({ onSuccess, onSwitchToLogin }) => {
   const [formData, setFormData] = useState({
@@ -42,13 +43,13 @@ const RegisterForm = ({ onSuccess, onSwitchToLogin }) => {
       formData.password
     );
 
+    setLoading(false);
+
     if (result.success) {
       if (onSuccess) onSuccess();
     } else {
       setError(result.error);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -64,83 +65,55 @@ const RegisterForm = ({ onSuccess, onSwitchToLogin }) => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label
-            htmlFor="username"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Username
-          </label>
-          <input
-            type="text"
-            id="username"
-            name="username"
-            value={formData.username}
-            onChange={handleChange}
-            required
-            minLength={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Choose a username"
-          />
-        </div>
+        <FormInput
+          label="Username"
+          id="username"
+          name="username"
+          type="text"
+          value={formData.username}
+          onChange={handleChange}
+          placeholder="Choose a username"
+          required
+          minLength={3}
+          disabled={loading}
+        />
 
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Email
-          </label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter your email"
-          />
-        </div>
+        <FormInput
+          label="Email"
+          id="email"
+          name="email"
+          type="email"
+          value={formData.email}
+          onChange={handleChange}
+          placeholder="Enter your email"
+          required
+          disabled={loading}
+        />
 
-        <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Password
-          </label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            minLength={6}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Choose a password (min 6 characters)"
-          />
-        </div>
+        <FormInput
+          label="Password"
+          id="password"
+          name="password"
+          type="password"
+          value={formData.password}
+          onChange={handleChange}
+          placeholder="Choose a password (min 6 characters)"
+          required
+          minLength={6}
+          disabled={loading}
+        />
 
-        <div>
-          <label
-            htmlFor="confirmPassword"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Confirm Password
-          </label>
-          <input
-            type="password"
-            id="confirmPassword"
-            name="confirmPassword"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Confirm your password"
-          />
-        </div>
+        <FormInput
+          label="Confirm Password"
+          id="confirmPassword"
+          name="confirmPassword"
+          type="password"
+          value={formData.confirmPassword}
+          onChange={handleChange}
+          placeholder="Confirm your password"
+          required
+          disabled={loading}
+        />
 
         <button
           type="submit"

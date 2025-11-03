@@ -6,21 +6,22 @@
 /**
  * Default LLM model for route optimization
  */
-export const DEFAULT_LLM_MODEL = "gemini-2.5-flash";
+import { DEFAULT_LLM_MODEL } from "../config/env";
+export { DEFAULT_LLM_MODEL };
 
 /**
  * Available LLM models for selection
  */
+// Only allow Gemini 2.5 Flash as selectable model
 export const LLM_MODELS = [
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Fast)" },
-  { value: "gemini-2.0-flash-exp", label: "Gemini 2.0 Flash Exp" },
-  { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro (Advanced)" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
 ];
 
 /**
- * Default depot location
+ * Default depot location for route optimization
  */
-export const DEFAULT_DEPOT_LOCATION = "Toronto";
+import { DEFAULT_DEPOT_LOCATION } from "../config/env";
+export { DEFAULT_DEPOT_LOCATION };
 
 /**
  * Vehicle types available for route optimization

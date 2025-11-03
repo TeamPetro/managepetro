@@ -211,3 +211,62 @@ class PromptService:
             formatted += "\n"
         
         return formatted.rstrip()
+
+    def format_batch_dispatch_prompt(
+        self,
+        trucks: List[TruckData],
+        stations: List[StationData],
+        depot_location: str,
+        depot_weather: WeatherData,
+        max_recommendations: int,
+    ) -> str:
+        """Create batch dispatch recommendations prompt"""
+        template = self.load_template("batch_dispatch_recommendations")
+
+        # Format trucks info
+        trucks_text = self._format_trucks_summary(trucks)
+        
+        # Format stations info
+        stations_text = self._format_dispatch_stations_data(stations)
+        
+        # Format depot weather
+        weather_text = f"{depot_weather.condition}, {depot_weather.temp_c}°C, Wind: {depot_weather.wind_kph} km/h"
+
+        variables = {
+            "depot_location": depot_location,
+            "depot_weather": weather_text,
+            "total_trucks": len(trucks),
+            "trucks_info": trucks_text,
+            "total_stations": len(stations),
+            "stations_info": stations_text,
+            "max_recommendations": max_recommendations,
+        }
+
+        formatted_prompt = template
+        for key, value in variables.items():
+            formatted_prompt = formatted_prompt.replace(f"{{{key}}}", str(value))
+
+        return formatted_prompt
+
+    def _format_trucks_summary(self, trucks: List[TruckData]) -> str:
+        """Format truck summary for batch recommendations"""
+        if not trucks:
+            return "No active trucks available."
+        
+        formatted = ""
+        for truck in trucks:
+            formatted += f"\n{truck.code} ({truck.plate})"
+            formatted += f"\n   - Status: {truck.status}"
+            formatted += f"\n   - Fuel Level: {truck.fuel_level_percent}%"
+            
+            if truck.compartments:
+                formatted += f"\n   - Compartments: {len(truck.compartments)}"
+                for comp in truck.compartments:
+                    utilization = int((comp['current_level_liters'] / comp['capacity_liters']) * 100)
+                    formatted += f"\n     • Compartment {comp['compartment_number']}: {comp['fuel_type']} - {comp['current_level_liters']}/{comp['capacity_liters']} L ({utilization}%)"
+            else:
+                formatted += f"\n   - Single Compartment: {truck.fuel_type} - {truck.capacity_liters} L"
+            
+            formatted += "\n"
+        
+        return formatted.strip()

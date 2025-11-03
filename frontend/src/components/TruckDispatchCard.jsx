@@ -1,10 +1,12 @@
 import { TruckIcon, WrenchScrewdriverIcon } from "@heroicons/react/24/outline";
 
+import { TRUCK_STATUS } from "../constants/config";
+
 function TruckDispatchCard({ truck, onOptimize, isOptimizing, disabled }) {
   const statusColor = {
-    active: "bg-green-100 text-green-800",
-    maintenance: "bg-yellow-100 text-yellow-800",
-    offline: "bg-red-100 text-red-800",
+    [TRUCK_STATUS.ACTIVE]: "bg-green-100 text-green-800",
+    [TRUCK_STATUS.MAINTENANCE]: "bg-yellow-100 text-yellow-800",
+    [TRUCK_STATUS.OFFLINE]: "bg-red-100 text-red-800",
   };
 
   const fuelLevelColor = (level) => {
@@ -26,7 +28,9 @@ function TruckDispatchCard({ truck, onOptimize, isOptimizing, disabled }) {
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
                 {truck.code}
               </h3>
-              <p className="text-xs sm:text-sm text-gray-500 truncate">{truck.plate_number}</p>
+              <p className="text-xs sm:text-sm text-gray-500 truncate">
+                {truck.plate_number}
+              </p>
             </div>
           </div>
           <span
@@ -64,7 +68,8 @@ function TruckDispatchCard({ truck, onOptimize, isOptimizing, disabled }) {
             </h4>
             <div className="space-y-2">
               {truck.compartments.map((comp) => {
-                const fillPercent = (comp.current_level_liters / comp.capacity_liters) * 100;
+                const fillPercent =
+                  (comp.current_level_liters / comp.capacity_liters) * 100;
                 return (
                   <div
                     key={comp.compartment_number}
@@ -106,9 +111,11 @@ function TruckDispatchCard({ truck, onOptimize, isOptimizing, disabled }) {
         {/* Action Button */}
         <button
           onClick={() => onOptimize(truck)}
-          disabled={disabled || truck.status !== "active" || isOptimizing}
+          disabled={
+            disabled || truck.status !== TRUCK_STATUS.ACTIVE || isOptimizing
+          }
           className={`w-full px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-            truck.status === "active" && !disabled
+            truck.status === TRUCK_STATUS.ACTIVE && !disabled
               ? "bg-blue-600 hover:bg-blue-700 text-white"
               : "bg-gray-300 text-gray-500 cursor-not-allowed"
           }`}
@@ -137,7 +144,7 @@ function TruckDispatchCard({ truck, onOptimize, isOptimizing, disabled }) {
               </svg>
               Optimizing...
             </span>
-          ) : truck.status === "maintenance" ? (
+          ) : truck.status === TRUCK_STATUS.MAINTENANCE ? (
             <span className="flex items-center justify-center">
               <WrenchScrewdriverIcon className="w-4 h-4 mr-2" />
               Under Maintenance

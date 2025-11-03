@@ -1,18 +1,20 @@
 import { useState, useMemo } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
 import ErrorBoundary from "./components/ErrorBoundary";
 import { AuthProvider } from "./contexts/AuthContext";
 import AuthGuard from "./components/auth/AuthGuard";
-import LoginForm from "./components/auth/LoginForm";
+import LoginPage from "./pages/LoginPage";
 import Header from "./components/Header";
 import RoutePage from "./pages/RoutePage";
 import StationsPage from "./pages/StationsPage";
 import DemoRoutePage from "./pages/DemoRoutePage";
-import DispatcherPage from "./pages/DispatcherPage";
+import ImprovedDispatcherPage from "./pages/ImprovedDispatcherPage";
+import { DEFAULT_LLM_MODEL } from "./constants/config";
 
 function App() {
-  const [selectedLLM, setSelectedLLM] = useState("gemini-2.5-flash");
+  const [selectedLLM, setSelectedLLM] = useState(DEFAULT_LLM_MODEL);
 
   // Memoize QueryClient to prevent recreating on each render (React 19 best practice)
   const queryClient = useMemo(
@@ -39,7 +41,7 @@ function App() {
 
               <Routes>
                 {/* Public routes */}
-                <Route path="/login" element={<LoginForm />} />
+                <Route path="/login" element={<LoginPage />} />
 
                 {/* Protected routes - require authentication */}
                 <Route
@@ -62,7 +64,7 @@ function App() {
                   path="/dispatcher"
                   element={
                     <AuthGuard>
-                      <DispatcherPage />
+                      <ImprovedDispatcherPage />
                     </AuthGuard>
                   }
                 />
