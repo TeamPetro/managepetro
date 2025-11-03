@@ -18,10 +18,13 @@ from models.data_models import (
 )
 from typing import Dict, Any, Optional, List
 import logging
+from constants import TRUCK_STATUS_ACTIVE
 from utils.serializers import station_available_dict, truck_simple_dict
+from utils.orm_converters import convert_truck_orm_to_data, convert_stations_list
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from .lc_router import get_chat_model
+from constants import DEFAULT_LLM_MODEL, DEFAULT_VEHICLE_TYPE, TIME_MODE_DEPARTURE
 import os
 import asyncio
 import time
@@ -147,15 +150,19 @@ class LLMService:
         from_location: str,
         to_location: str,
         session: AsyncSession,
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "gemini-2.5-flash"),
+        llm_model: str = None,
         departure_time: Optional[str] = None,
         arrival_time: Optional[str] = None,
-        time_mode: str = "departure",
+        time_mode: str = TIME_MODE_DEPARTURE,
         delivery_date: Optional[str] = None,
-        vehicle_type: str = "fuel_delivery_truck",
+        vehicle_type: str = DEFAULT_VEHICLE_TYPE,
         notes: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate route optimization using standardized data models with SQLAlchemy 2.0"""
+
+        # Use default model if not provided
+        if llm_model is None:
+            llm_model = os.getenv("DEFAULT_LLM_MODEL", DEFAULT_LLM_MODEL)
 
         # Get standardized data using SQLAlchemy
         db_data = await self._get_database_data_sqlalchemy(
@@ -213,10 +220,14 @@ class LLMService:
         truck_id: str,
         depot_location: str,
         session: AsyncSession,
-        # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "gemini-2.5-flash"),
+        llm_model: str = None,
     ) -> Dict[str, Any]:
         """Optimize dispatch route for a truck to deliver fuel to stations in need using SQLAlchemy 2.0"""
+
+        # Use default model if not provided
+        if llm_model is None:
+            llm_model = os.getenv("DEFAULT_LLM_MODEL", DEFAULT_LLM_MODEL)
+
         try:
             self._logger.info(
                 "Starting dispatch optimization for truck_id: %s, depot: %s",
@@ -293,12 +304,17 @@ class LLMService:
         self,
         depot_location: str,
         session: AsyncSession,
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
+        llm_model: str = None,
         max_recommendations: int = 5,
         filter_region: Optional[str] = None,
         filter_city: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Get AI-powered batch dispatch recommendations for optimal truck-station matching"""
+
+        # Use default model if not provided
+        if llm_model is None:
+            llm_model = os.getenv("DEFAULT_LLM_MODEL", DEFAULT_LLM_MODEL)
+
         try:
             # Get all active trucks
             trucks = await self._get_active_trucks_sqlalchemy(session)
@@ -391,21 +407,7 @@ class LLMService:
                 )
                 result = await session.execute(stations_stmt)
                 stations_orm = result.scalars().all()
-                return [
-                    StationData(
-                        id=station.id,
-                        code=station.code,
-                        name=station.name,
-                        lat=station.lat,
-                        lon=station.lon,
-                        city=station.city,
-                        region=station.region,
-                        fuel_type=station.fuel_type,
-                        capacity_liters=station.capacity_liters,
-                        current_level_liters=station.current_level_liters,
-                    )
-                    for station in stations_orm
-                ]
+                return convert_stations_list(stations_orm)
 
             async def get_deliveries():
                 deliveries_stmt = (
@@ -463,7 +465,7 @@ class LLMService:
             async def get_trucks():
                 trucks_stmt = (
                     select(Truck)
-                    .where(Truck.status == "active")
+                    .where(Truck.status == TRUCK_STATUS_ACTIVE)
                     .order_by(Truck.capacity_liters.desc())
                     .limit(5)
                 )
@@ -577,39 +579,7 @@ class LLMService:
             stmt = select(Station).order_by(Station.name)
             result = await session.execute(stmt)
             stations_orm = result.scalars().all()
-
-            # Convert SQLAlchemy models to data models
-            stations = []
-            for station in stations_orm:
-                station_data = StationData(
-                    id=station.id,
-                    code=station.code,
-                    name=station.name,
-                    lat=float(station.lat) if station.lat else None,
-                    lon=float(station.lon) if station.lon else None,
-                    city=station.city,
-                    region=station.region,
-                    fuel_type=station.fuel_type,
-                    capacity_liters=(
-                        float(station.capacity_liters)
-                        if station.capacity_liters
-                        else None
-                    ),
-                    current_level_liters=(
-                        float(station.current_level_liters)
-                        if station.current_level_liters
-                        else None
-                    ),
-                    request_method=station.request_method,
-                    low_fuel_threshold=(
-                        float(station.low_fuel_threshold)
-                        if station.low_fuel_threshold
-                        else None
-                    ),
-                )
-                stations.append(station_data)
-
-            return stations
+            return convert_stations_list(stations_orm)
         except SQLAlchemyError as e:
             self._logger.exception("SQLAlchemy error getting stations")
             return []
@@ -628,30 +598,7 @@ class LLMService:
             for truck in trucks_orm:
                 # Get compartments using SQLAlchemy relationship
                 await session.refresh(truck, attribute_names=["compartments"])
-
-                compartments = []
-                for comp in truck.compartments:
-                    compartments.append(
-                        {
-                            "compartment_number": comp.compartment_number,
-                            "fuel_type": comp.fuel_type,
-                            "capacity_liters": float(comp.capacity_liters),
-                            "current_level_liters": float(comp.current_level_liters),
-                        }
-                    )
-
-                truck_data = TruckData(
-                    id=truck.id,
-                    code=truck.code,
-                    plate=truck.plate,
-                    capacity_liters=(
-                        float(truck.capacity_liters) if truck.capacity_liters else None
-                    ),
-                    fuel_level_percent=truck.fuel_level_percent,
-                    fuel_type=truck.fuel_type,
-                    status=truck.status,
-                    compartments=compartments,
-                )
+                truck_data = convert_truck_orm_to_data(truck)
                 trucks.append(truck_data)
 
             return trucks
@@ -668,7 +615,7 @@ class LLMService:
         """Get all active trucks using SQLAlchemy 2.0"""
         try:
             # Query active trucks
-            stmt = select(Truck).where(Truck.status == "active")
+            stmt = select(Truck).where(Truck.status == TRUCK_STATUS_ACTIVE)
             result = await session.execute(stmt)
             trucks_orm = result.scalars().all()
 
@@ -676,34 +623,7 @@ class LLMService:
             for truck_orm in trucks_orm:
                 # Get compartments
                 await session.refresh(truck_orm, attribute_names=["compartments"])
-
-                compartments = []
-                for comp in truck_orm.compartments:
-                    compartments.append(
-                        {
-                            "compartment_number": comp.compartment_number,
-                            "fuel_type": comp.fuel_type,
-                            "capacity_liters": float(comp.capacity_liters),
-                            "current_level_liters": float(comp.current_level_liters),
-                        }
-                    )
-
-                trucks.append(
-                    TruckData(
-                        id=truck_orm.id,
-                        code=truck_orm.code,
-                        plate=truck_orm.plate,
-                        capacity_liters=(
-                            float(truck_orm.capacity_liters)
-                            if truck_orm.capacity_liters
-                            else None
-                        ),
-                        fuel_level_percent=truck_orm.fuel_level_percent,
-                        fuel_type=truck_orm.fuel_type,
-                        status=truck_orm.status,
-                        compartments=compartments,
-                    )
-                )
+                trucks.append(convert_truck_orm_to_data(truck_orm))
 
             return trucks
         except SQLAlchemyError as e:
@@ -766,31 +686,7 @@ class LLMService:
             # Get compartments using SQLAlchemy relationship
             await session.refresh(truck_orm, attribute_names=["compartments"])
 
-            compartments = []
-            for comp in truck_orm.compartments:
-                compartments.append(
-                    {
-                        "compartment_number": comp.compartment_number,
-                        "fuel_type": comp.fuel_type,
-                        "capacity_liters": float(comp.capacity_liters),
-                        "current_level_liters": float(comp.current_level_liters),
-                    }
-                )
-
-            return TruckData(
-                id=truck_orm.id,
-                code=truck_orm.code,
-                plate=truck_orm.plate,
-                capacity_liters=(
-                    float(truck_orm.capacity_liters)
-                    if truck_orm.capacity_liters
-                    else None
-                ),
-                fuel_level_percent=truck_orm.fuel_level_percent,
-                fuel_type=truck_orm.fuel_type,
-                status=truck_orm.status,
-                compartments=compartments,
-            )
+            return convert_truck_orm_to_data(truck_orm)
         except SQLAlchemyError as e:
             self._logger.exception("SQLAlchemy error getting truck by ID")
             return None
@@ -833,26 +729,7 @@ class LLMService:
 
             result = await session.execute(stmt)
             stations_orm = result.scalars().all()
-
-            stations = []
-            for station in stations_orm:
-                station_data = StationData(
-                    id=station.id,
-                    code=station.code,
-                    name=station.name,
-                    lat=station.lat,
-                    lon=station.lon,
-                    city=station.city,
-                    region=station.region,
-                    fuel_type=station.fuel_type,
-                    capacity_liters=station.capacity_liters,
-                    current_level_liters=station.current_level_liters,
-                    request_method=station.request_method,
-                    low_fuel_threshold=station.low_fuel_threshold,
-                )
-                stations.append(station_data)
-
-            return stations
+            return convert_stations_list(stations_orm)
         except SQLAlchemyError as e:
             self._logger.exception("SQLAlchemy error getting stations needing refuel")
             return []
@@ -928,7 +805,7 @@ class LLMService:
         weather_data: WeatherResult,
         departure_time: Optional[str] = None,
         arrival_time: Optional[str] = None,
-        time_mode: str = "departure",
+        time_mode: str = TIME_MODE_DEPARTURE,
     ) -> Dict[str, Any]:
         """Parse AI response using standardized data models"""
 
@@ -959,7 +836,7 @@ class LLMService:
             traffic_info = {"note": "Traffic analysis in AI response"}
 
         # Add time-based information to traffic_info
-        if time_mode == "departure" and departure_time:
+        if time_mode == TIME_MODE_DEPARTURE and departure_time:
             traffic_info["requested_departure"] = departure_time
         elif time_mode == "arrival" and arrival_time:
             traffic_info["requested_arrival"] = arrival_time

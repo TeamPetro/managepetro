@@ -9,7 +9,7 @@ Example:
     "openai:gpt-4o-mini"
     "anthropic:claude-3-5-sonnet-latest"
     "google:gemini-1.5-pro"
-    "gemini-2.5-flash"  # defaults to Google
+    "gemini-2.5-flash"  # defaults to Google (from constants.DEFAULT_LLM_MODEL)
 """
 
 from langchain_openai import ChatOpenAI

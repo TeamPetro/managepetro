@@ -22,6 +22,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
+from constants import (
+    DEFAULT_FUEL_TYPE,
+    DEFAULT_LOW_FUEL_THRESHOLD,
+    REQUEST_METHOD_MANUAL,
+    TRUCK_STATUS_ACTIVE,
+    DELIVERY_STATUS_PLANNED,
+)
 
 
 class Base(DeclarativeBase):
@@ -70,15 +77,16 @@ class Station(Base):
     city: Mapped[Optional[str]] = mapped_column(String(100))
     region: Mapped[Optional[str]] = mapped_column(String(100))
     fuel_type: Mapped[str] = mapped_column(
-        Enum("diesel", "gasoline", "propane", name="fuel_type_enum"), default="diesel"
+        Enum("diesel", "gasoline", "propane", name="fuel_type_enum"),
+        default=DEFAULT_FUEL_TYPE,
     )
     capacity_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
     current_level_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
     request_method: Mapped[str] = mapped_column(
-        Enum("IoT", "Manual", name="request_method_enum"), default="Manual"
+        Enum("IoT", "Manual", name="request_method_enum"), default=REQUEST_METHOD_MANUAL
     )
     low_fuel_threshold: Mapped[Optional[float]] = mapped_column(
-        DECIMAL(12, 2), default=5000
+        DECIMAL(12, 2), default=DEFAULT_LOW_FUEL_THRESHOLD
     )
 
     # Relationships
@@ -102,11 +110,11 @@ class Truck(Base):
     fuel_level_percent: Mapped[Optional[int]] = mapped_column(Integer)
     fuel_type: Mapped[str] = mapped_column(
         Enum("diesel", "gasoline", "propane", name="truck_fuel_type_enum"),
-        default="diesel",
+        default=DEFAULT_FUEL_TYPE,
     )
     status: Mapped[str] = mapped_column(
         Enum("active", "maintenance", "offline", name="truck_status_enum"),
-        default="active",
+        default=TRUCK_STATUS_ACTIVE,
     )
 
     # Relationships
@@ -136,7 +144,7 @@ class Delivery(Base):
         Enum(
             "planned", "enroute", "delivered", "canceled", name="delivery_status_enum"
         ),
-        default="planned",
+        default=DELIVERY_STATUS_PLANNED,
     )
 
     # Relationships

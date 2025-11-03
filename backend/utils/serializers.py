@@ -1,13 +1,10 @@
 from typing import Any, Dict
-
-
-def _format_percent(numerator: float | None, denominator: float | None) -> int:
-    try:
-        if denominator and denominator > 0 and numerator is not None:
-            return int((numerator / denominator) * 100)
-    except Exception:
-        pass
-    return 0
+from constants import DEFAULT_COUNTRY, REQUEST_METHOD_MANUAL, DEFAULT_LOW_FUEL_THRESHOLD
+from utils.database_utils import (
+    format_station_id,
+    format_truck_id,
+    calculate_fuel_percentage,
+)
 
 
 def station_api_dict(station: Any) -> Dict[str, Any]:
@@ -19,15 +16,15 @@ def station_api_dict(station: Any) -> Dict[str, Any]:
     current = getattr(station, "current_level_liters", None) or 0
 
     return {
-        "station_id": f"station-{getattr(station, 'id', 0):03d}",
+        "station_id": format_station_id(getattr(station, "id", 0)),
         "name": getattr(station, "name", None),
         "city": getattr(station, "city", None),
         "region": getattr(station, "region", None),
-        "country": "Canada",
+        "country": DEFAULT_COUNTRY,
         "fuel_type": getattr(station, "fuel_type", None),
         "capacity_liters": capacity,
         "current_level_liters": current,
-        "fuel_level": _format_percent(current, capacity),
+        "fuel_level": calculate_fuel_percentage(current, capacity),
         "code": getattr(station, "code", None),
         "lat": (
             float(getattr(station, "lat", 0))
@@ -39,14 +36,20 @@ def station_api_dict(station: Any) -> Dict[str, Any]:
             if getattr(station, "lon", None) is not None
             else None
         ),
-        "request_method": getattr(station, "request_method", None) or "Manual",
-        "low_fuel_threshold": getattr(station, "low_fuel_threshold", None) or 5000,
+        "request_method": getattr(station, "request_method", None)
+        or REQUEST_METHOD_MANUAL,
+        "low_fuel_threshold": getattr(station, "low_fuel_threshold", None)
+        or DEFAULT_LOW_FUEL_THRESHOLD,
         "needs_refuel": bool(
             getattr(station, "needs_refuel", False)
             or (
                 capacity
                 and current
-                and current < (getattr(station, "low_fuel_threshold", 5000) or 5000)
+                and current
+                < (
+                    getattr(station, "low_fuel_threshold", DEFAULT_LOW_FUEL_THRESHOLD)
+                    or DEFAULT_LOW_FUEL_THRESHOLD
+                )
             )
         ),
     }
@@ -55,14 +58,14 @@ def station_api_dict(station: Any) -> Dict[str, Any]:
 def station_available_dict(station: Any) -> Dict[str, Any]:
     """A slightly different station shape used in dispatch responses."""
     return {
-        "station_id": f"station-{getattr(station, 'id', 0):03d}",
+        "station_id": format_station_id(getattr(station, "id", 0)),
         "name": getattr(station, "name", None),
         "city": getattr(station, "city", None),
         "region": getattr(station, "region", None),
         "fuel_type": getattr(station, "fuel_type", None),
         "current_level": getattr(station, "current_level_liters", None),
         "capacity": getattr(station, "capacity_liters", None),
-        "fuel_level_percent": _format_percent(
+        "fuel_level_percent": calculate_fuel_percentage(
             getattr(station, "current_level_liters", None),
             getattr(station, "capacity_liters", None),
         ),
@@ -84,7 +87,7 @@ def station_available_dict(station: Any) -> Dict[str, Any]:
 def truck_api_dict(truck: Any) -> Dict[str, Any]:
     """Serialize a Truck ORM or data model object into the API truck shape."""
     return {
-        "truck_id": f"truck-{getattr(truck, 'id', 0):03d}",
+        "truck_id": format_truck_id(getattr(truck, "id", 0)),
         "plate_number": getattr(truck, "plate", None),
         "capacity_liters": getattr(truck, "capacity_liters", None),
         "fuel_level_percent": getattr(truck, "fuel_level_percent", None),
@@ -97,7 +100,7 @@ def truck_api_dict(truck: Any) -> Dict[str, Any]:
 
 def truck_simple_dict(truck: Any) -> Dict[str, Any]:
     return {
-        "truck_id": f"truck-{getattr(truck, 'id', 0):03d}",
+        "truck_id": format_truck_id(getattr(truck, "id", 0)),
         "code": getattr(truck, "code", None),
         "plate": getattr(truck, "plate", None),
         "status": getattr(truck, "status", None),
