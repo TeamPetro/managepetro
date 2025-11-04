@@ -55,6 +55,7 @@ function ImprovedDispatcherPage() {
   const [sortBy, setSortBy] = useState("code");
   const [expandedTruckId, setExpandedTruckId] = useState(null);
   const [showFleetFilters, setShowFleetFilters] = useState(false);
+  const [hasDriverFilter, setHasDriverFilter] = useState("all"); // "all", "assigned", "unassigned"
 
   // Fetch data using React Query
   const {
@@ -132,6 +133,15 @@ function ImprovedDispatcherPage() {
       filtered = filtered.filter((truck) => truck.fuel_type === fuelTypeFilter);
     }
 
+    // Apply driver filter
+    if (hasDriverFilter !== "all") {
+      if (hasDriverFilter === "assigned") {
+        filtered = filtered.filter((truck) => truck.driver_name);
+      } else if (hasDriverFilter === "unassigned") {
+        filtered = filtered.filter((truck) => !truck.driver_name);
+      }
+    }
+
     // Apply sorting
     filtered.sort((a, b) => {
       switch (sortBy) {
@@ -147,7 +157,14 @@ function ImprovedDispatcherPage() {
     });
 
     return filtered;
-  }, [activeTrucks, searchQuery, statusFilter, fuelTypeFilter, sortBy]);
+  }, [
+    activeTrucks,
+    searchQuery,
+    statusFilter,
+    fuelTypeFilter,
+    sortBy,
+    hasDriverFilter,
+  ]);
 
   const isLoading = trucksLoading || stationsLoading;
   const error = trucksError || stationsError;
@@ -794,7 +811,7 @@ function ImprovedDispatcherPage() {
 
               {/* Filter Panel */}
               {showFleetFilters && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-lg">
                   {/* Status Filter */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -828,6 +845,22 @@ function ImprovedDispatcherPage() {
                       <option value="diesel">Diesel</option>
                       <option value="regular">Regular</option>
                       <option value="premium">Premium</option>
+                    </select>
+                  </div>
+
+                  {/* Driver Filter */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Driver
+                    </label>
+                    <select
+                      value={hasDriverFilter}
+                      onChange={(e) => setHasDriverFilter(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="all">All Trucks</option>
+                      <option value="assigned">Has Driver</option>
+                      <option value="unassigned">No Driver</option>
                     </select>
                   </div>
 

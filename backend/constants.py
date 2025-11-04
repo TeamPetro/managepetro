@@ -45,6 +45,30 @@ DELIVERY_STATUS_ENROUTE = "enroute"
 DELIVERY_STATUS_DELIVERED = "delivered"
 DELIVERY_STATUS_CANCELLED = "cancelled"
 
+# Driver status options
+DRIVER_STATUS_ACTIVE = "active"
+DRIVER_STATUS_ON_LEAVE = "on_leave"
+DRIVER_STATUS_INACTIVE = "inactive"
+
+# Driver shift status
+SHIFT_STATUS_ACTIVE = "active"
+SHIFT_STATUS_COMPLETED = "completed"
+SHIFT_STATUS_INTERRUPTED = "interrupted"
+
+# Driver Hours of Service limits (per FMCSA regulations - adjust per jurisdiction)
+MAX_DRIVING_HOURS_PER_DAY = 11  # hours
+MAX_ON_DUTY_HOURS_PER_DAY = 14  # hours
+REQUIRED_REST_PERIOD_HOURS = 10  # hours
+MAX_DRIVING_HOURS_PER_WEEK = 60  # hours (7-day period)
+MAX_DRIVING_HOURS_PER_WEEK_8DAY = 70  # hours (8-day period)
+
+# Driver certifications
+MIN_LICENSE_CLASS = "C"  # Minimum for commercial vehicles
+HAZMAT_CERTIFICATION_VALIDITY_YEARS = 2
+MEDICAL_EXAM_VALIDITY_YEARS = 2
+MAX_DRIVER_AGE = 70  # Company policy
+MIN_DRIVER_AGE = 21  # Federal minimum for interstate
+
 # Fuel thresholds
 DEFAULT_LOW_FUEL_THRESHOLD = 5000  # liters
 CRITICAL_FUEL_THRESHOLD = 1000  # liters

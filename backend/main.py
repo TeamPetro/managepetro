@@ -42,6 +42,8 @@ from models.database_models import (
     Truck as TruckORM,
     Station as StationORM,
     Delivery as DeliveryORM,
+    Driver as DriverORM,
+    DriverShift as DriverShiftORM,
 )
 import logging
 
@@ -239,6 +241,263 @@ async def create_truck(
         return {"truck": truck_api_dict(new_truck)}
     except Exception as e:
         raise_500("Failed to create truck", e)
+
+
+# ==================== DRIVER ENDPOINTS ====================
+
+
+@app.get("/api/drivers")
+async def get_drivers(
+    status: str = None,
+    available_only: bool = False,
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Get all drivers with optional filters"""
+    try:
+        from models.data_models import DriverData
+        from datetime import datetime, timedelta
+
+        # Build query
+        query = select(DriverORM)
+
+        # Apply status filter
+        if status:
+            query = query.where(DriverORM.status == status)
+
+        # Execute query
+        result = await session.execute(query)
+        drivers_orm = result.scalars().all()
+
+        # Convert to DriverData and calculate current shift hours
+        drivers = []
+        for driver_orm in drivers_orm:
+            # Calculate current shift hours (today)
+            today_start = datetime.now().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            shift_query = select(DriverShiftORM).where(
+                and_(
+                    DriverShiftORM.driver_id == driver_orm.id,
+                    DriverShiftORM.shift_start >= today_start,
+                    DriverShiftORM.status == "active",
+                )
+            )
+            shift_result = await session.execute(shift_query)
+            active_shifts = shift_result.scalars().all()
+
+            current_shift_hours = sum(
+                (shift.total_hours or 0) for shift in active_shifts
+            )
+
+            # Calculate weekly hours (last 7 days)
+            week_start = datetime.now() - timedelta(days=7)
+            week_query = select(DriverShiftORM).where(
+                and_(
+                    DriverShiftORM.driver_id == driver_orm.id,
+                    DriverShiftORM.shift_start >= week_start,
+                    DriverShiftORM.status.in_(["active", "completed"]),
+                )
+            )
+            week_result = await session.execute(week_query)
+            week_shifts = week_result.scalars().all()
+
+            weekly_hours = sum((shift.total_hours or 0) for shift in week_shifts)
+
+            # Get assigned truck code
+            assigned_truck_code = None
+            if driver_orm.trucks:
+                assigned_truck_code = driver_orm.trucks[0].code
+
+            driver_data = DriverData(
+                driver_id=driver_orm.id,
+                employee_id=driver_orm.employee_id,
+                first_name=driver_orm.first_name,
+                last_name=driver_orm.last_name,
+                phone=driver_orm.phone,
+                email=driver_orm.email,
+                license_number=driver_orm.license_number,
+                license_class=driver_orm.license_class,
+                license_expiry_date=driver_orm.license_expiry_date,
+                hazmat_certified=driver_orm.hazmat_certified,
+                hazmat_expiry_date=driver_orm.hazmat_expiry_date,
+                tanker_endorsement=driver_orm.tanker_endorsement,
+                years_experience=driver_orm.years_experience,
+                status=driver_orm.status,
+                max_hours_per_shift=float(driver_orm.max_hours_per_shift or 11.0),
+                current_location=driver_orm.current_location,
+                home_terminal=driver_orm.home_terminal,
+                hourly_rate=(
+                    float(driver_orm.hourly_rate) if driver_orm.hourly_rate else None
+                ),
+                certifications=driver_orm.certifications,
+                hired_date=driver_orm.hired_date,
+                last_medical_exam=driver_orm.last_medical_exam,
+                next_medical_exam=driver_orm.next_medical_exam,
+                current_shift_hours=current_shift_hours,
+                weekly_hours=weekly_hours,
+                assigned_truck_code=assigned_truck_code,
+            )
+
+            # Filter by availability if requested
+            if available_only and not driver_data.is_available:
+                continue
+
+            drivers.append(driver_data.to_api_dict())
+
+        return {"drivers": drivers, "count": len(drivers)}
+    except Exception as e:
+        _logger.error(f"Failed to fetch drivers: {e}")
+        raise_500("Failed to fetch drivers", e)
+
+
+@app.get("/api/drivers/{driver_id}")
+async def get_driver(
+    driver_id: int,
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Get a single driver by ID"""
+    try:
+        from models.data_models import DriverData
+        from datetime import datetime, timedelta
+
+        result = await session.execute(
+            select(DriverORM).where(DriverORM.id == driver_id)
+        )
+        driver_orm = result.scalar_one_or_none()
+
+        if not driver_orm:
+            raise_404("Driver not found")
+
+        # Calculate current shift hours
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        shift_query = select(DriverShiftORM).where(
+            and_(
+                DriverShiftORM.driver_id == driver_orm.id,
+                DriverShiftORM.shift_start >= today_start,
+                DriverShiftORM.status == "active",
+            )
+        )
+        shift_result = await session.execute(shift_query)
+        active_shifts = shift_result.scalars().all()
+
+        current_shift_hours = sum((shift.total_hours or 0) for shift in active_shifts)
+
+        # Calculate weekly hours
+        week_start = datetime.now() - timedelta(days=7)
+        week_query = select(DriverShiftORM).where(
+            and_(
+                DriverShiftORM.driver_id == driver_orm.id,
+                DriverShiftORM.shift_start >= week_start,
+                DriverShiftORM.status.in_(["active", "completed"]),
+            )
+        )
+        week_result = await session.execute(week_query)
+        week_shifts = week_result.scalars().all()
+
+        weekly_hours = sum((shift.total_hours or 0) for shift in week_shifts)
+
+        # Get assigned truck
+        assigned_truck_code = None
+        if driver_orm.trucks:
+            assigned_truck_code = driver_orm.trucks[0].code
+
+        driver_data = DriverData(
+            driver_id=driver_orm.id,
+            employee_id=driver_orm.employee_id,
+            first_name=driver_orm.first_name,
+            last_name=driver_orm.last_name,
+            phone=driver_orm.phone,
+            email=driver_orm.email,
+            license_number=driver_orm.license_number,
+            license_class=driver_orm.license_class,
+            license_expiry_date=driver_orm.license_expiry_date,
+            hazmat_certified=driver_orm.hazmat_certified,
+            hazmat_expiry_date=driver_orm.hazmat_expiry_date,
+            tanker_endorsement=driver_orm.tanker_endorsement,
+            years_experience=driver_orm.years_experience,
+            status=driver_orm.status,
+            max_hours_per_shift=float(driver_orm.max_hours_per_shift or 11.0),
+            current_location=driver_orm.current_location,
+            home_terminal=driver_orm.home_terminal,
+            hourly_rate=(
+                float(driver_orm.hourly_rate) if driver_orm.hourly_rate else None
+            ),
+            certifications=driver_orm.certifications,
+            hired_date=driver_orm.hired_date,
+            last_medical_exam=driver_orm.last_medical_exam,
+            next_medical_exam=driver_orm.next_medical_exam,
+            current_shift_hours=current_shift_hours,
+            weekly_hours=weekly_hours,
+            assigned_truck_code=assigned_truck_code,
+        )
+
+        return {"driver": driver_data.to_api_dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        _logger.error(f"Failed to fetch driver: {e}")
+        raise_500("Failed to fetch driver", e)
+
+
+@app.get("/api/drivers/{driver_id}/shifts")
+async def get_driver_shifts(
+    driver_id: int,
+    limit: int = 10,
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Get shift history for a driver"""
+    try:
+        from models.data_models import DriverShiftData
+
+        # Check if driver exists
+        driver_result = await session.execute(
+            select(DriverORM).where(DriverORM.id == driver_id)
+        )
+        if not driver_result.scalar_one_or_none():
+            raise_404("Driver not found")
+
+        # Get shifts
+        query = (
+            select(DriverShiftORM)
+            .where(DriverShiftORM.driver_id == driver_id)
+            .order_by(DriverShiftORM.shift_start.desc())
+            .limit(limit)
+        )
+
+        result = await session.execute(query)
+        shifts_orm = result.scalars().all()
+
+        shifts = [
+            DriverShiftData(
+                shift_id=shift.id,
+                driver_id=shift.driver_id,
+                shift_start=shift.shift_start,
+                shift_end=shift.shift_end,
+                total_hours=float(shift.total_hours) if shift.total_hours else None,
+                break_hours=float(shift.break_hours),
+                status=shift.status,
+                notes=shift.notes,
+            ).to_api_dict()
+            for shift in shifts_orm
+        ]
+
+        return {"shifts": shifts, "count": len(shifts)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        _logger.error(f"Failed to fetch driver shifts: {e}")
+        raise_500("Failed to fetch driver shifts", e)
+
+
+@app.get("/api/drivers/available")
+async def get_available_drivers(
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Get all available drivers (active status, within hours limit, valid certs)"""
+    return await get_drivers(status="active", available_only=True, session=session)
+
+
+# ==================== STATIONS ENDPOINTS ====================
 
 
 # Get single station by id or code

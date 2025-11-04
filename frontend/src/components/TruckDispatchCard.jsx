@@ -6,6 +6,10 @@ import {
   MapPinIcon,
   CalendarIcon,
   InformationCircleIcon,
+  UserCircleIcon,
+  ExclamationTriangleIcon,
+  CheckBadgeIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 
 import { TRUCK_STATUS } from "../constants/config";
@@ -122,6 +126,115 @@ function TruckDispatchCard({
             </div>
           </div>
         )}
+
+        {/* Driver Information */}
+        <div className="mb-4">
+          {truck.driver_name ? (
+            <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2">
+                  <UserCircleIcon className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                  <span className="font-medium text-gray-900 text-sm">
+                    {truck.driver_name}
+                  </span>
+                  {truck.driver_status && (
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        truck.driver_status === "active"
+                          ? "bg-green-100 text-green-800"
+                          : truck.driver_status === "on_leave"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {truck.driver_status === "active"
+                        ? "Active"
+                        : truck.driver_status === "on_leave"
+                        ? "On Leave"
+                        : "Inactive"}
+                    </span>
+                  )}
+                </div>
+                {/* Availability indicator dot */}
+                {truck.driver_hours_remaining !== undefined && (
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      truck.driver_hours_remaining <= 0
+                        ? "bg-red-500"
+                        : truck.driver_hours_remaining < 2
+                        ? "bg-red-400"
+                        : truck.driver_hours_remaining < 4
+                        ? "bg-yellow-400"
+                        : "bg-green-500"
+                    }`}
+                    title={
+                      truck.driver_hours_remaining <= 0
+                        ? "Unavailable - No hours remaining"
+                        : truck.driver_hours_remaining < 2
+                        ? "Critical - Very few hours remaining"
+                        : truck.driver_hours_remaining < 4
+                        ? "Warning - Limited hours remaining"
+                        : "Available"
+                    }
+                  />
+                )}
+              </div>
+
+              {/* Hours remaining */}
+              {truck.driver_hours_remaining !== undefined && (
+                <div className="flex items-center space-x-1 text-xs text-gray-600 mb-2">
+                  <ClockIcon className="w-4 h-4 text-gray-500" />
+                  <span>
+                    <span
+                      className={`font-semibold ${
+                        truck.driver_hours_remaining <= 0
+                          ? "text-red-600"
+                          : truck.driver_hours_remaining < 2
+                          ? "text-red-500"
+                          : truck.driver_hours_remaining < 4
+                          ? "text-yellow-600"
+                          : "text-green-600"
+                      }`}
+                    >
+                      {truck.driver_hours_remaining.toFixed(1)}h
+                    </span>{" "}
+                    remaining today
+                  </span>
+                </div>
+              )}
+
+              {/* Certifications */}
+              {truck.driver_certifications && (
+                <div className="flex flex-wrap gap-1">
+                  {truck.driver_certifications.hazmat_certified && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                      <CheckBadgeIcon className="w-3 h-3 mr-1" />
+                      HazMat
+                    </span>
+                  )}
+                  {truck.driver_certifications.tanker_endorsement && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      <CheckBadgeIcon className="w-3 h-3 mr-1" />
+                      Tanker
+                    </span>
+                  )}
+                  {truck.driver_certifications.license_class && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                      Class {truck.driver_certifications.license_class}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-300 flex items-center space-x-2">
+              <ExclamationTriangleIcon className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+              <span className="text-sm font-medium text-yellow-800">
+                No driver assigned
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* Expandable Details Section */}
         {onToggleExpand && (

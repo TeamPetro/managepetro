@@ -258,7 +258,7 @@ class PromptService:
         return formatted_prompt
 
     def _format_trucks_summary(self, trucks: List[TruckData]) -> str:
-        """Format truck summary for batch recommendations"""
+        """Format truck summary for batch recommendations with driver information"""
         if not trucks:
             return "No active trucks available."
 
@@ -266,6 +266,23 @@ class PromptService:
         for truck in trucks:
             formatted += f"\n{truck.code} ({truck.plate})"
             formatted += f"\n   - Status: {truck.status}"
+
+            # Driver information
+            if truck.driver_name:
+                formatted += f"\n   - Driver: {truck.driver_name}"
+                if truck.driver_hours_remaining:
+                    formatted += (
+                        f" ({truck.driver_hours_remaining:.1f}h remaining today)"
+                    )
+                if truck.driver_certifications:
+                    formatted += f"\n   - Driver Certs: {truck.driver_certifications}"
+            else:
+                formatted += f"\n   - Driver: UNASSIGNED (needs driver assignment)"
+
+            # Location
+            if truck.current_location:
+                formatted += f"\n   - Location: {truck.current_location}"
+
             formatted += f"\n   - Fuel Level: {truck.fuel_level_percent}%"
 
             if truck.compartments:

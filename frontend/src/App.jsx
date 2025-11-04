@@ -11,6 +11,7 @@ import RoutePage from "./pages/RoutePage";
 import StationsPage from "./pages/StationsPage";
 import DemoRoutePage from "./pages/DemoRoutePage";
 import ImprovedDispatcherPage from "./pages/ImprovedDispatcherPage";
+import DriversPage from "./pages/DriversPage";
 import { DEFAULT_LLM_MODEL } from "./constants/config";
 
 function App() {
@@ -73,6 +74,14 @@ function App() {
                   element={
                     <AuthGuard>
                       <DemoRoutePage />
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/drivers"
+                  element={
+                    <AuthGuard>
+                      <DriversPage />
                     </AuthGuard>
                   }
                 />

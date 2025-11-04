@@ -3,6 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import joinedload
 from .prompt_service import PromptService
 from .api_utils import get_weather_async
 import re
@@ -588,11 +589,15 @@ class LLMService:
             return []
 
     async def get_all_trucks_sqlalchemy(self, session: AsyncSession) -> List[TruckData]:
-        """Get all trucks using SQLAlchemy 2.0 - new method"""
+        """Get all trucks using SQLAlchemy 2.0 with driver information"""
         try:
-            stmt = select(Truck).order_by(Truck.code)
+            stmt = (
+                select(Truck)
+                .options(joinedload(Truck.current_driver))
+                .order_by(Truck.code)
+            )
             result = await session.execute(stmt)
-            trucks_orm = result.scalars().all()
+            trucks_orm = result.unique().scalars().all()
 
             trucks = []
             for truck in trucks_orm:
@@ -612,12 +617,16 @@ class LLMService:
     async def _get_active_trucks_sqlalchemy(
         self, session: AsyncSession
     ) -> List[TruckData]:
-        """Get all active trucks using SQLAlchemy 2.0"""
+        """Get all active trucks using SQLAlchemy 2.0 with driver information"""
         try:
-            # Query active trucks
-            stmt = select(Truck).where(Truck.status == TRUCK_STATUS_ACTIVE)
+            # Query active trucks with driver relationship loaded
+            stmt = (
+                select(Truck)
+                .options(joinedload(Truck.current_driver))
+                .where(Truck.status == TRUCK_STATUS_ACTIVE)
+            )
             result = await session.execute(stmt)
-            trucks_orm = result.scalars().all()
+            trucks_orm = result.unique().scalars().all()
 
             trucks = []
             for truck_orm in trucks_orm:
@@ -636,13 +645,23 @@ class LLMService:
     async def _get_truck_by_id_sqlalchemy(
         self, session: AsyncSession, truck_id: str
     ) -> Optional[TruckData]:
-        """Get truck by ID using SQLAlchemy 2.0"""
+        """Get truck by ID using SQLAlchemy 2.0 with driver information"""
         try:
             self._logger.debug("Looking for truck with identifier: %s", truck_id)
 
-            # Parse display format like "T10 (CA-2211)" to extract "T10"
-            if " (" in truck_id and truck_id.endswith(")"):
-                truck_id = truck_id.split(" (")[0]
+            # Parse various display formats to extract truck code:
+            # "T10 (CA-2211)" -> "T10"
+            # "T01 (AB-1421) - John Martinez" -> "T01"
+            # "TRK-001 (AB-1234) - Driver Name" -> "TRK-001"
+
+            # First, remove anything after " - " (driver name)
+            if " - " in truck_id:
+                truck_id = truck_id.split(" - ")[0].strip()
+                self._logger.debug("Removed driver name suffix, now: %s", truck_id)
+
+            # Then, remove plate number in parentheses
+            if " (" in truck_id:
+                truck_id = truck_id.split(" (")[0].strip()
                 self._logger.debug(
                     "Parsed display format to truck identifier: %s", truck_id
                 )
@@ -655,19 +674,31 @@ class LLMService:
                     self._logger.debug(
                         "Converted truck-%03d to ID: %s", numeric_id, numeric_id
                     )
-                    stmt = select(Truck).where(Truck.id == numeric_id)
+                    stmt = (
+                        select(Truck)
+                        .options(joinedload(Truck.current_driver))
+                        .where(Truck.id == numeric_id)
+                    )
                 except (ValueError, IndexError):
                     self._logger.debug("Invalid truck ID format: %s", truck_id)
                     return None
             else:
                 # Look up by code (T01, T02, etc.) or numeric ID
                 if truck_id.isdigit():
-                    stmt = select(Truck).where(Truck.id == int(truck_id))
+                    stmt = (
+                        select(Truck)
+                        .options(joinedload(Truck.current_driver))
+                        .where(Truck.id == int(truck_id))
+                    )
                 else:
-                    stmt = select(Truck).where(Truck.code == truck_id)
+                    stmt = (
+                        select(Truck)
+                        .options(joinedload(Truck.current_driver))
+                        .where(Truck.code == truck_id)
+                    )
 
             result = await session.execute(stmt)
-            truck_orm = result.scalar_one_or_none()
+            truck_orm = result.unique().scalar_one_or_none()
 
             if not truck_orm:
                 # Debug: show available trucks

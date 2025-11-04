@@ -102,6 +102,20 @@ def convert_truck_orm_to_data(
             convert_compartment_to_dict(comp) for comp in truck.compartments
         ]
 
+    # Extract driver information if available
+    driver_name = None
+    driver_status = None
+    driver_hours_remaining = None
+    driver_certifications = None
+    current_driver_id = truck.current_driver_id
+
+    if hasattr(truck, "current_driver") and truck.current_driver:
+        driver = truck.current_driver
+        driver_name = f"{driver.first_name} {driver.last_name}"
+        driver_status = driver.status
+        driver_hours_remaining = float(driver.max_hours_per_shift or 11.0)
+        driver_certifications = driver.certifications
+
     return TruckData(
         id=truck.id,
         code=truck.code,
@@ -113,6 +127,14 @@ def convert_truck_orm_to_data(
         fuel_type=truck.fuel_type,
         status=truck.status,
         compartments=compartment_dicts,
+        current_driver_id=current_driver_id,
+        driver_name=driver_name,
+        driver_status=driver_status,
+        driver_hours_remaining=driver_hours_remaining,
+        driver_certifications=driver_certifications,
+        current_location=truck.current_location,
+        last_maintenance_date=truck.last_maintenance_date,
+        next_maintenance_date=truck.next_maintenance_date,
     )
 
 

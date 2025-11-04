@@ -5,12 +5,13 @@ These models correspond to the database schema and provide type-safe
 database operations using SQLAlchemy's modern declarative approach.
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional
 from sqlalchemy import (
     String,
     Integer,
     DateTime,
+    Date,
     Boolean,
     Enum,
     DECIMAL,
@@ -61,6 +62,68 @@ class User(Base):
     __table_args__ = (
         Index("idx_username", "username"),
         Index("idx_email", "email"),
+    )
+
+
+class Driver(Base):
+    """Driver model for fuel truck operators."""
+
+    __tablename__ = "drivers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    employee_id: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    first_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    phone: Mapped[Optional[str]] = mapped_column(String(20))
+    email: Mapped[Optional[str]] = mapped_column(String(255))
+    license_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    license_class: Mapped[str] = mapped_column(String(10), nullable=False)
+    license_expiry_date: Mapped[date] = mapped_column(Date, nullable=False)
+    hazmat_certified: Mapped[bool] = mapped_column(Boolean, default=False)
+    hazmat_expiry_date: Mapped[Optional[date]] = mapped_column(Date)
+    tanker_endorsement: Mapped[bool] = mapped_column(Boolean, default=False)
+    years_experience: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(
+        Enum("active", "on_leave", "inactive", name="driver_status_enum"),
+        default="active",
+    )
+    max_hours_per_shift: Mapped[Optional[float]] = mapped_column(
+        DECIMAL(4, 2), default=12.00
+    )
+    current_location: Mapped[Optional[str]] = mapped_column(String(255))
+    home_terminal: Mapped[Optional[str]] = mapped_column(String(100))
+    hourly_rate: Mapped[Optional[float]] = mapped_column(DECIMAL(8, 2))
+    certifications: Mapped[Optional[str]] = mapped_column(Text)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    hired_date: Mapped[Optional[date]] = mapped_column(Date)
+    last_medical_exam: Mapped[Optional[date]] = mapped_column(Date)
+    next_medical_exam: Mapped[Optional[date]] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.current_timestamp(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=func.current_timestamp(),
+        onupdate=func.current_timestamp(),
+        nullable=False,
+    )
+
+    # Relationships
+    trucks: Mapped[List["Truck"]] = relationship(
+        "Truck", back_populates="current_driver"
+    )
+    deliveries: Mapped[List["Delivery"]] = relationship(
+        "Delivery", back_populates="driver"
+    )
+    shifts: Mapped[List["DriverShift"]] = relationship(
+        "DriverShift", back_populates="driver", cascade="all, delete-orphan"
+    )
+
+    # Indexes for performance
+    __table_args__ = (
+        Index("idx_employee_id", "employee_id"),
+        Index("idx_status", "status"),
+        Index("idx_license_number", "license_number"),
     )
 
 
@@ -116,14 +179,26 @@ class Truck(Base):
         Enum("active", "maintenance", "offline", name="truck_status_enum"),
         default=TRUCK_STATUS_ACTIVE,
     )
+    current_driver_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("drivers.id", ondelete="SET NULL")
+    )
+    last_maintenance_date: Mapped[Optional[date]] = mapped_column(Date)
+    next_maintenance_date: Mapped[Optional[date]] = mapped_column(Date)
+    current_location: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Relationships
+    current_driver: Mapped[Optional["Driver"]] = relationship(
+        "Driver", back_populates="trucks", foreign_keys=[current_driver_id]
+    )
     deliveries: Mapped[List["Delivery"]] = relationship(
         "Delivery", back_populates="truck", cascade="all, delete-orphan"
     )
     compartments: Mapped[List["TruckCompartment"]] = relationship(
         "TruckCompartment", back_populates="truck", cascade="all, delete-orphan"
     )
+
+    # Indexes for performance
+    __table_args__ = (Index("idx_current_driver", "current_driver_id"),)
 
 
 class Delivery(Base):
@@ -138,8 +213,16 @@ class Delivery(Base):
     station_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("stations.id", ondelete="CASCADE")
     )
+    driver_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("drivers.id", ondelete="SET NULL")
+    )
     volume_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
     delivery_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    completed_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    estimated_duration_minutes: Mapped[Optional[int]] = mapped_column(Integer)
+    actual_duration_minutes: Mapped[Optional[int]] = mapped_column(Integer)
+    distance_km: Mapped[Optional[float]] = mapped_column(DECIMAL(8, 2))
+    notes: Mapped[Optional[str]] = mapped_column(Text)
     status: Mapped[str] = mapped_column(
         Enum(
             "planned", "enroute", "delivered", "canceled", name="delivery_status_enum"
@@ -153,6 +236,16 @@ class Delivery(Base):
     )
     station: Mapped[Optional["Station"]] = relationship(
         "Station", back_populates="deliveries"
+    )
+    driver: Mapped[Optional["Driver"]] = relationship(
+        "Driver", back_populates="deliveries"
+    )
+
+    # Indexes for performance
+    __table_args__ = (
+        Index("idx_driver", "driver_id"),
+        Index("idx_status", "status"),
+        Index("idx_delivery_date", "delivery_date"),
     )
 
 
@@ -216,3 +309,32 @@ class WeatherData(Base):
     wind: Mapped[Optional[float]] = mapped_column(DECIMAL(5, 2))
     humidity: Mapped[Optional[float]] = mapped_column(DECIMAL(5, 2))
     collected_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
+
+
+class DriverShift(Base):
+    """Driver shift model for Hours of Service compliance tracking."""
+
+    __tablename__ = "driver_shifts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    driver_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False
+    )
+    shift_start: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    shift_end: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    total_hours: Mapped[Optional[float]] = mapped_column(DECIMAL(4, 2))
+    break_hours: Mapped[float] = mapped_column(DECIMAL(4, 2), default=0)
+    status: Mapped[str] = mapped_column(
+        Enum("active", "completed", "interrupted", name="shift_status_enum"),
+        default="active",
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Relationships
+    driver: Mapped["Driver"] = relationship("Driver", back_populates="shifts")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index("idx_driver_shift", "driver_id", "shift_start"),
+        Index("idx_shift_status", "status"),
+    )

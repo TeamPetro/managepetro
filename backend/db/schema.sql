@@ -15,6 +15,39 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX idx_email (email)
 );
 
+-- DRIVERS
+
+CREATE TABLE IF NOT EXISTS drivers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  employee_id VARCHAR(32) UNIQUE NOT NULL,
+  first_name VARCHAR(50) NOT NULL,
+  last_name VARCHAR(50) NOT NULL,
+  phone VARCHAR(20),
+  email VARCHAR(255),
+  license_number VARCHAR(50) UNIQUE NOT NULL,
+  license_class VARCHAR(10) NOT NULL,
+  license_expiry_date DATE NOT NULL,
+  hazmat_certified BOOLEAN DEFAULT FALSE,
+  hazmat_expiry_date DATE,
+  tanker_endorsement BOOLEAN DEFAULT FALSE,
+  years_experience INT DEFAULT 0,
+  status ENUM('active', 'on_leave', 'inactive') DEFAULT 'active',
+  max_hours_per_shift DECIMAL(4,2) DEFAULT 12.00,
+  current_location VARCHAR(255),
+  home_terminal VARCHAR(100),
+  hourly_rate DECIMAL(8,2),
+  certifications TEXT,
+  notes TEXT,
+  hired_date DATE,
+  last_medical_exam DATE,
+  next_medical_exam DATE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_employee_id (employee_id),
+  INDEX idx_status (status),
+  INDEX idx_license_number (license_number)
+);
+
 -- STATIONS
 
 CREATE TABLE IF NOT EXISTS stations (
@@ -41,7 +74,13 @@ CREATE TABLE IF NOT EXISTS trucks (
   capacity_liters DECIMAL(12,2),
   fuel_level_percent TINYINT,
   fuel_type ENUM('diesel', 'gasoline', 'propane') DEFAULT 'diesel',
-  status ENUM('active', 'maintenance', 'offline') DEFAULT 'active'
+  status ENUM('active', 'maintenance', 'offline') DEFAULT 'active',
+  current_driver_id INT,
+  last_maintenance_date DATE,
+  next_maintenance_date DATE,
+  current_location VARCHAR(255),
+  FOREIGN KEY (current_driver_id) REFERENCES drivers(id) ON DELETE SET NULL,
+  INDEX idx_current_driver (current_driver_id)
 );
 
 -- DELIVERIES
@@ -49,11 +88,21 @@ CREATE TABLE IF NOT EXISTS deliveries (
   id INT AUTO_INCREMENT PRIMARY KEY,
   truck_id INT,
   station_id INT,
+  driver_id INT,
   volume_liters DECIMAL(12,2),
   delivery_date DATETIME,
+  completed_date DATETIME,
+  estimated_duration_minutes INT,
+  actual_duration_minutes INT,
+  distance_km DECIMAL(8,2),
   status ENUM('planned', 'enroute', 'delivered', 'canceled') DEFAULT 'planned',
+  notes TEXT,
   FOREIGN KEY (truck_id) REFERENCES trucks(id),
-  FOREIGN KEY (station_id) REFERENCES stations(id)
+  FOREIGN KEY (station_id) REFERENCES stations(id),
+  FOREIGN KEY (driver_id) REFERENCES drivers(id) ON DELETE SET NULL,
+  INDEX idx_driver (driver_id),
+  INDEX idx_status (status),
+  INDEX idx_delivery_date (delivery_date)
 );
 
 -- STATION FUEL LEVELS
@@ -89,4 +138,20 @@ CREATE TABLE IF NOT EXISTS weather_data (
   wind FLOAT,
   humidity FLOAT,
   collected_at TIMESTAMP
+);
+
+-- DRIVER SHIFTS (for Hours of Service compliance)
+
+CREATE TABLE IF NOT EXISTS driver_shifts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  driver_id INT NOT NULL,
+  shift_start DATETIME NOT NULL,
+  shift_end DATETIME,
+  total_hours DECIMAL(4,2),
+  break_hours DECIMAL(4,2) DEFAULT 0,
+  status ENUM('active', 'completed', 'interrupted') DEFAULT 'active',
+  notes TEXT,
+  FOREIGN KEY (driver_id) REFERENCES drivers(id) ON DELETE CASCADE,
+  INDEX idx_driver_shift (driver_id, shift_start),
+  INDEX idx_shift_status (status)
 );
