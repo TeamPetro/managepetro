@@ -140,8 +140,9 @@ pip install -r requirements.txt
 **📍 Nuclear reset (run in backend folder):**
 
 ```bash
-docker compose down -v     # Delete all data
+docker compose down -v    # Delete all data
 pip install -r requirements.txt
 docker compose up -d       # Start fresh
 fastapi dev main.py       # Restart server
 ```
+ 
