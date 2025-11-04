@@ -210,6 +210,7 @@ class TruckData:
     driver_status: Optional[str] = None
     driver_hours_remaining: Optional[float] = None
     driver_certifications: Optional[str] = None
+    has_active_deliveries: Optional[bool] = None
     # Location and maintenance
     current_location: Optional[str] = None
     last_maintenance_date: Optional[date] = None

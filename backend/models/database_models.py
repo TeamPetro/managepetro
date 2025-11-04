@@ -108,6 +108,11 @@ class Driver(Base):
         nullable=False,
     )
 
+    @property
+    def full_name(self) -> str:
+        """Get driver's full name"""
+        return f"{self.first_name} {self.last_name}"
+
     # Relationships
     trucks: Mapped[List["Truck"]] = relationship(
         "Truck", back_populates="current_driver"

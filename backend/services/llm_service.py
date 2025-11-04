@@ -382,6 +382,17 @@ class LLMService:
                 depot_location=depot_location,
             )
 
+            # Add driver information to each recommendation
+            truck_lookup = {truck.code: truck for truck in trucks}
+            for rec in result.get("recommendations", []):
+                truck_code = rec.get("truck_code")
+                if truck_code and truck_code in truck_lookup:
+                    truck = truck_lookup[truck_code]
+                    rec["driver_name"] = truck.driver_name
+                    rec["driver_hours_remaining"] = truck.driver_hours_remaining
+                    rec["truck_plate"] = truck.plate
+                    rec["truck_status"] = truck.status
+
             # Add filter information to response
             result["filter_region"] = filter_region
             result["filter_city"] = filter_city
@@ -594,6 +605,7 @@ class LLMService:
             stmt = (
                 select(Truck)
                 .options(joinedload(Truck.current_driver))
+                .options(joinedload(Truck.deliveries))
                 .order_by(Truck.code)
             )
             result = await session.execute(stmt)
@@ -623,6 +635,7 @@ class LLMService:
             stmt = (
                 select(Truck)
                 .options(joinedload(Truck.current_driver))
+                .options(joinedload(Truck.deliveries))
                 .where(Truck.status == TRUCK_STATUS_ACTIVE)
             )
             result = await session.execute(stmt)
@@ -677,6 +690,7 @@ class LLMService:
                     stmt = (
                         select(Truck)
                         .options(joinedload(Truck.current_driver))
+                        .options(joinedload(Truck.deliveries))
                         .where(Truck.id == numeric_id)
                     )
                 except (ValueError, IndexError):
@@ -688,12 +702,14 @@ class LLMService:
                     stmt = (
                         select(Truck)
                         .options(joinedload(Truck.current_driver))
+                        .options(joinedload(Truck.deliveries))
                         .where(Truck.id == int(truck_id))
                     )
                 else:
                     stmt = (
                         select(Truck)
                         .options(joinedload(Truck.current_driver))
+                        .options(joinedload(Truck.deliveries))
                         .where(Truck.code == truck_id)
                     )
 
@@ -1217,9 +1233,44 @@ class LLMService:
                 # Sort stops by step_number to ensure correct order
                 route_stops.sort(key=lambda x: x.get("step_number", float("inf")))
 
-                # Remove step_number from the output as it's only used for sorting
+                # Extract station codes and clean up route stops
+                # Also match station names to actual station codes from the stations list
+                station_lookup = {}
+                for station in stations:
+                    # Create lookup by name and code
+                    station_lookup[station.name.lower()] = station.code
+                    station_lookup[station.code.lower()] = station.code
+                    # Also match "name (code)" format
+                    full_name = f"{station.name} ({station.code})".lower()
+                    station_lookup[full_name] = station.code
+
                 for stop in route_stops:
                     stop.pop("step_number", None)
+
+                    # Extract station code from station name (format: "Station Name (CODE)")
+                    station_text = stop.get("station", "")
+                    station_code = None
+
+                    if "(" in station_text and ")" in station_text:
+                        # Extract code from parentheses
+                        start_idx = station_text.rfind("(")
+                        end_idx = station_text.rfind(")")
+                        if start_idx < end_idx:
+                            station_code = station_text[start_idx + 1 : end_idx].strip()
+                            # Also extract clean station name without code
+                            stop["station_name"] = station_text[:start_idx].strip()
+
+                    # If no code found in parentheses, try to match from station list
+                    if not station_code:
+                        station_code = station_lookup.get(station_text.lower())
+
+                    if station_code:
+                        stop["station_code"] = station_code
+                    else:
+                        # Log warning if we couldn't find a station code
+                        self._logger.warning(
+                            "Could not extract station code from: %s", station_text
+                        )
         except Exception:
             self._logger.exception("Error parsing route stops")
 

@@ -6,6 +6,7 @@ import {
   useDispatchRecommendations,
   useDispatchFilters,
 } from "../hooks/useDispatchQueries";
+import { executeDispatch } from "../services/dispatch-api";
 import LoadingState from "../components/LoadingState";
 import ErrorMessage from "../components/ErrorMessage";
 import AIErrorMessage from "../components/AIErrorMessage";
@@ -47,6 +48,8 @@ function ImprovedDispatcherPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [dispatchingRecommendation, setDispatchingRecommendation] =
     useState(null);
+  const [executingDispatch, setExecutingDispatch] = useState(false);
+  const [executionResult, setExecutionResult] = useState(null);
 
   // Fleet management states
   const [searchQuery, setSearchQuery] = useState("");
@@ -94,7 +97,9 @@ function ImprovedDispatcherPage() {
   const trucks = trucksData?.trucks || [];
   const stations = stationsData?.stations || [];
 
-  const activeTrucks = trucks.filter((t) => t.status === TRUCK_STATUS.ACTIVE);
+  const activeTrucks = trucks.filter(
+    (t) => t.status === TRUCK_STATUS.ACTIVE && !t.has_active_deliveries
+  );
   const stationsNeedingFuel = stations.filter(
     (station) =>
       station.needs_refuel || station.fuel_level < FUEL_THRESHOLDS.HIGH
@@ -150,7 +155,7 @@ function ImprovedDispatcherPage() {
         case "fuel_level":
           return (b.fuel_level_percent || 0) - (a.fuel_level_percent || 0);
         case "capacity":
-          return (b.total_capacity || 0) - (a.total_capacity || 0);
+          return (b.capacity_liters || 0) - (a.capacity_liters || 0);
         default:
           return 0;
       }
@@ -205,6 +210,90 @@ function ImprovedDispatcherPage() {
         },
       }
     );
+  };
+
+  const handleExecuteDispatch = async () => {
+    if (!dispatchResult) return;
+
+    setExecutingDispatch(true);
+    setDispatchError(null);
+
+    try {
+      // Extract station codes from the dispatch result
+      const stationIds = (dispatchResult.route_stops || [])
+        .map((s) => s.station_code || s.code || s.station_id)
+        .filter((id) => id !== null && id !== undefined)
+        .map((id) => String(id)); // Ensure all IDs are strings
+
+      console.log("Route stops:", dispatchResult.route_stops);
+      console.log("Extracted station IDs:", stationIds);
+
+      if (stationIds.length === 0) {
+        throw new Error("No stations found in dispatch plan");
+      }
+
+      const requestData = {
+        truck_id: dispatchResult.truck_code,
+        station_ids: stationIds,
+        depot_location: depotLocation,
+        estimated_distance_km: dispatchResult.total_distance_km,
+        estimated_duration_minutes: dispatchResult.estimated_duration_hours
+          ? Math.round(dispatchResult.estimated_duration_hours * 60)
+          : null,
+        notes: `AI-optimized dispatch created by ${
+          dispatchResult.requested_by || "system"
+        }`,
+      };
+
+      const response = await executeDispatch(requestData);
+
+      setExecutionResult(response);
+      setExecutingDispatch(false);
+
+      // Show success message
+      alert(
+        `✅ Dispatch executed successfully!\n\n` +
+          `Truck: ${response.truck_code}\n` +
+          `Driver: ${response.driver_name || "No driver assigned"}\n` +
+          `Deliveries: ${response.deliveries_created}\n` +
+          `Total Volume: ${response.total_volume_liters?.toLocaleString()} L\n\n` +
+          `Status: ${response.status}`
+      );
+
+      // Clear the dispatch result to show the execution result
+      setDispatchResult(null);
+    } catch (error) {
+      console.error("Execute dispatch error:", error);
+      console.error("Error data:", error?.data);
+      console.error("Error response:", error?.response?.data);
+      setExecutingDispatch(false);
+
+      // Extract detailed error message
+      let errorMessage = "Unknown error";
+
+      // Check error.data.detail first (from http-client wrapper)
+      const errorDetail = error?.data?.detail || error?.response?.data?.detail;
+
+      if (errorDetail) {
+        // FastAPI validation error format
+        if (Array.isArray(errorDetail)) {
+          errorMessage = errorDetail
+            .map((err) => `${err.loc?.join(".") || "field"}: ${err.msg}`)
+            .join(", ");
+        } else if (typeof errorDetail === "string") {
+          errorMessage = errorDetail;
+        } else {
+          errorMessage = JSON.stringify(errorDetail);
+        }
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      }
+
+      setDispatchError(errorMessage);
+      alert(`❌ Failed to execute dispatch: ${errorMessage}`);
+    }
   };
 
   if (isLoading) {
@@ -479,6 +568,144 @@ function ImprovedDispatcherPage() {
               setDispatchResult(null);
             }}
           />
+
+          {/* Execute Dispatch Button */}
+          <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center">
+                  <TruckIcon className="w-5 h-5 mr-2 text-green-600" />
+                  Ready to Execute Dispatch
+                </h3>
+                <p className="text-sm text-gray-700 mb-2">
+                  This will create actual delivery records in the system and
+                  update the truck status to "Active".
+                </p>
+                <ul className="text-xs text-gray-600 space-y-1 mb-4">
+                  <li>
+                    ✓ Creates delivery records for all{" "}
+                    {dispatchResult.route_stops?.length || 0} stations
+                  </li>
+                  <li>✓ Assigns the driver to these deliveries</li>
+                  <li>✓ Updates truck status to "Active"</li>
+                  <li>✓ Locks the truck from other dispatches</li>
+                  <li>✓ Starts tracking delivery progress</li>
+                </ul>
+                {dispatchResult.driver_name ? (
+                  <div className="text-sm text-green-700">
+                    <strong>Driver:</strong> {dispatchResult.driver_name}
+                  </div>
+                ) : (
+                  <div className="text-sm text-yellow-700 flex items-center">
+                    <ExclamationTriangleIcon className="w-4 h-4 mr-1" />
+                    <strong>Warning:</strong> No driver assigned to this truck
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleExecuteDispatch}
+                  disabled={executingDispatch}
+                  className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 min-w-[180px] ${
+                    executingDispatch
+                      ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                      : "bg-green-600 text-white hover:bg-green-700 hover:shadow-lg"
+                  }`}
+                >
+                  {executingDispatch ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+                      <span>Executing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <TruckIcon className="w-5 h-5" />
+                      <span>Execute Dispatch</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setDispatchResult(null)}
+                  className="px-6 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Execution Result */}
+      {executionResult && (
+        <div className="mb-6 bg-green-50 border-2 border-green-500 rounded-lg p-6">
+          <div className="flex items-start justify-between mb-4">
+            <h2 className="text-xl font-bold text-green-900 flex items-center">
+              <TruckIcon className="w-6 h-6 text-green-600 mr-2" />
+              Dispatch Executed Successfully
+            </h2>
+            <button
+              onClick={() => setExecutionResult(null)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <XMarkIcon className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <div className="text-sm text-gray-600">Truck</div>
+              <div className="font-semibold text-gray-900">
+                {executionResult.truck_code} ({executionResult.truck_plate})
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">Driver</div>
+              <div className="font-semibold text-gray-900">
+                {executionResult.driver_name || "No driver assigned"}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">Deliveries Created</div>
+              <div className="font-semibold text-gray-900">
+                {executionResult.deliveries_created} stations
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600">Total Volume</div>
+              <div className="font-semibold text-gray-900">
+                {executionResult.total_volume_liters?.toLocaleString()} L
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg p-4 mb-4">
+            <div className="text-sm font-medium text-gray-700 mb-2">
+              Delivery Stops:
+            </div>
+            <div className="space-y-1">
+              {executionResult.deliveries?.map((delivery, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between text-sm"
+                >
+                  <span className="text-gray-700">
+                    {idx + 1}. {delivery.station_name} ({delivery.station_code})
+                  </span>
+                  <span className="text-gray-600">
+                    {delivery.volume_liters?.toLocaleString()} L
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="text-sm text-green-700">
+            <strong>Status:</strong> {executionResult.status} • Departure:{" "}
+            {new Date(executionResult.departure_time).toLocaleString()}
+          </div>
         </div>
       )}
 

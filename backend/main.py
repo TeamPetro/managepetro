@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func, text
 from services.llm_service import LLMService
 from utils.serializers import (
     station_api_dict,
@@ -34,7 +34,9 @@ from models.request_models import (
     DispatchOptimizationRequest,
     DispatchRecommendationsRequest,
     TruckCreate,
+    ExecuteDispatchRequest,
 )
+from models.data_models import DriverData, DriverShiftData
 from database import get_db_session
 from config import config
 from constants import CORS_ORIGINS
@@ -203,8 +205,6 @@ async def get_trucks(session: AsyncSession = Depends(get_db_session)):
 @app.get("/api/trucks/{truck_id}")
 async def get_truck(truck_id: str, session: AsyncSession = Depends(get_db_session)):
     """Get a single truck by numeric id or code (e.g., 'truck-001' or 'T01')"""
-    from services.llm_service import LLMService
-
     try:
         llm = llm_service  # reuse the existing instance
         truck = await llm._get_truck_by_id_sqlalchemy(session, truck_id)
@@ -254,9 +254,6 @@ async def get_drivers(
 ):
     """Get all drivers with optional filters"""
     try:
-        from models.data_models import DriverData
-        from datetime import datetime, timedelta
-
         # Build query
         query = select(DriverORM)
 
@@ -357,9 +354,6 @@ async def get_driver(
 ):
     """Get a single driver by ID"""
     try:
-        from models.data_models import DriverData
-        from datetime import datetime, timedelta
-
         result = await session.execute(
             select(DriverORM).where(DriverORM.id == driver_id)
         )
@@ -447,8 +441,6 @@ async def get_driver_shifts(
 ):
     """Get shift history for a driver"""
     try:
-        from models.data_models import DriverShiftData
-
         # Check if driver exists
         driver_result = await session.execute(
             select(DriverORM).where(DriverORM.id == driver_id)
@@ -741,6 +733,185 @@ async def get_dispatch_recommendations(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Dispatch recommendations failed: {str(e)}"
+        )
+
+
+# Execute dispatch - creates actual delivery records and starts the trip
+@app.post("/api/dispatch/execute")
+async def execute_dispatch(
+    request: ExecuteDispatchRequest,
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Execute dispatch by creating actual delivery records and updating truck status (Protected)"""
+    try:
+        _logger.info(
+            "Execute dispatch request: truck_id=%s, stations=%s, user=%s",
+            request.truck_id,
+            request.station_ids,
+            current_user.username,
+        )
+
+        # Parse truck_id to get the actual truck
+        truck_id_str = request.truck_id
+
+        # Handle different formats (same logic as _get_truck_by_id_sqlalchemy)
+        if " - " in truck_id_str:
+            truck_id_str = truck_id_str.split(" - ")[0].strip()
+        if " (" in truck_id_str:
+            truck_id_str = truck_id_str.split(" (")[0].strip()
+
+        # Look up truck by code or ID
+        if truck_id_str.isdigit():
+            stmt = select(TruckORM).where(TruckORM.id == int(truck_id_str))
+        else:
+            stmt = select(TruckORM).where(TruckORM.code == truck_id_str)
+
+        result = await session.execute(stmt)
+        truck = result.scalar_one_or_none()
+
+        if not truck:
+            raise HTTPException(
+                status_code=404, detail=f"Truck {request.truck_id} not found"
+            )
+
+        # Get driver if truck has one assigned
+        driver_id = truck.current_driver_id
+        driver = None
+
+        # Check if driver has available hours
+        if driver_id:
+            driver_stmt = select(DriverORM).where(DriverORM.id == driver_id)
+            driver_result = await session.execute(driver_stmt)
+            driver = driver_result.scalar_one_or_none()
+
+            if driver:
+                # Calculate current shift hours
+                today_start = datetime.now(timezone.utc).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+
+                shift_stmt = select(
+                    func.coalesce(
+                        func.sum(
+                            func.timestampdiff(
+                                text("HOUR"),
+                                DriverShiftORM.shift_start,
+                                func.coalesce(DriverShiftORM.shift_end, func.now()),
+                            )
+                        ),
+                        0,
+                    )
+                ).where(
+                    and_(
+                        DriverShiftORM.driver_id == driver_id,
+                        DriverShiftORM.shift_start >= today_start,
+                    )
+                )
+                shift_result = await session.execute(shift_stmt)
+                current_hours = float(shift_result.scalar() or 0)
+                max_hours = float(driver.max_hours_per_shift)
+                hours_remaining = max_hours - current_hours
+
+                if hours_remaining <= 0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Driver {driver.first_name} {driver.last_name} has no hours remaining today ({current_hours:.1f}h worked of {max_hours}h allowed)",
+                    )
+
+                _logger.info(
+                    f"Driver {driver.first_name} {driver.last_name} has {hours_remaining:.1f}h remaining today"
+                )
+
+        # Create delivery records for each station
+        deliveries_created = []
+        delivery_date = datetime.now(timezone.utc)
+
+        for station_id_str in request.station_ids:
+            # Look up station by code or ID
+            if station_id_str.isdigit():
+                station_stmt = select(StationORM).where(
+                    StationORM.id == int(station_id_str)
+                )
+            else:
+                station_stmt = select(StationORM).where(
+                    StationORM.code == station_id_str
+                )
+
+            station_result = await session.execute(station_stmt)
+            station = station_result.scalar_one_or_none()
+
+            if not station:
+                _logger.warning(f"Station {station_id_str} not found, skipping")
+                continue
+
+            # Calculate volume needed (fill to 80% of capacity as reasonable target)
+            # Convert Decimal to float to avoid type issues
+            capacity = float(station.capacity_liters or 0)
+            current_level = float(station.current_level_liters or 0)
+            volume_needed = max(0, (capacity * 0.8) - current_level)
+
+            # Create delivery record
+            delivery = DeliveryORM(
+                truck_id=truck.id,
+                station_id=station.id,
+                driver_id=driver_id,
+                volume_liters=volume_needed,
+                delivery_date=delivery_date,
+                estimated_duration_minutes=request.estimated_duration_minutes,
+                distance_km=request.estimated_distance_km,
+                notes=request.notes,
+                status="planned",  # Initially planned, will be updated as driver progresses
+            )
+
+            session.add(delivery)
+            deliveries_created.append(
+                {
+                    "station_code": station.code,
+                    "station_name": station.name,
+                    "volume_liters": volume_needed,
+                    "status": "planned",
+                }
+            )
+
+        # Update truck status to "active" if deliveries were created
+        if deliveries_created:
+            truck.status = "active"
+            _logger.info(f"Updated truck {truck.code} status to active")
+
+        # Commit all changes
+        await session.commit()
+
+        _logger.info(
+            f"Created {len(deliveries_created)} delivery records for truck {truck.code}"
+        )
+
+        return {
+            "success": True,
+            "truck_code": truck.code,
+            "truck_plate": truck.plate,
+            "driver_name": (
+                f"{driver.first_name} {driver.last_name}"
+                if driver_id and driver
+                else None
+            ),
+            "deliveries_created": len(deliveries_created),
+            "deliveries": deliveries_created,
+            "total_volume_liters": sum(d["volume_liters"] for d in deliveries_created),
+            "estimated_distance_km": request.estimated_distance_km,
+            "estimated_duration_minutes": request.estimated_duration_minutes,
+            "departure_time": delivery_date.isoformat(),
+            "status": "dispatched",
+            "message": f"Successfully dispatched truck {truck.code} to {len(deliveries_created)} stations",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        _logger.error("Execute dispatch failed: %s", str(e))
+        await session.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Dispatch execution failed: {str(e)}"
         )
 
 

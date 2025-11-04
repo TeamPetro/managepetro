@@ -1,5 +1,10 @@
 from typing import Any, Dict
-from constants import DEFAULT_COUNTRY, REQUEST_METHOD_MANUAL, DEFAULT_LOW_FUEL_THRESHOLD
+from constants import (
+    DEFAULT_COUNTRY,
+    REQUEST_METHOD_MANUAL,
+    DEFAULT_LOW_FUEL_THRESHOLD,
+    DELIVERY_STATUS_ENROUTE,
+)
 from utils.database_utils import (
     format_station_id,
     format_truck_id,
@@ -86,6 +91,44 @@ def station_available_dict(station: Any) -> Dict[str, Any]:
 
 def truck_api_dict(truck: Any) -> Dict[str, Any]:
     """Serialize a Truck ORM or data model object into the API truck shape."""
+    # Get driver information - handle both ORM objects and TruckData objects
+    driver_name = None
+    driver_status = None
+    driver_hours_remaining = None
+
+    # Check if it's a TruckData object (has driver_name attribute)
+    if hasattr(truck, "driver_name") and getattr(truck, "driver_name", None):
+        driver_name = truck.driver_name
+        driver_status = getattr(truck, "driver_status", None)
+        driver_hours_remaining = getattr(truck, "driver_hours_remaining", None)
+    # Check if it's an ORM object with current_driver relationship
+    elif hasattr(truck, "current_driver") and truck.current_driver:
+        driver_name = (
+            f"{truck.current_driver.first_name} {truck.current_driver.last_name}"
+        )
+        driver_status = truck.current_driver.status
+
+        # Calculate hours remaining (simplified - would need full logic)
+        if hasattr(truck.current_driver, "max_hours_per_shift"):
+            driver_hours_remaining = float(
+                truck.current_driver.max_hours_per_shift or 11.0
+            )
+
+    # Check for active deliveries - handle both TruckData objects and ORM objects
+    has_active_deliveries = False
+    if (
+        hasattr(truck, "has_active_deliveries")
+        and truck.has_active_deliveries is not None
+    ):
+        # TruckData object has pre-calculated has_active_deliveries
+        has_active_deliveries = truck.has_active_deliveries
+    elif hasattr(truck, "deliveries") and truck.deliveries:
+        # ORM object with deliveries relationship loaded
+        active_statuses = [DELIVERY_STATUS_ENROUTE]
+        has_active_deliveries = any(
+            d.status in active_statuses for d in truck.deliveries
+        )
+
     return {
         "truck_id": format_truck_id(getattr(truck, "id", 0)),
         "plate_number": getattr(truck, "plate", None),
@@ -95,6 +138,10 @@ def truck_api_dict(truck: Any) -> Dict[str, Any]:
         "status": getattr(truck, "status", None),
         "code": getattr(truck, "code", None),
         "compartments": getattr(truck, "compartments", None) or [],
+        "driver_name": driver_name,
+        "driver_status": driver_status,
+        "driver_hours_remaining": driver_hours_remaining,
+        "has_active_deliveries": has_active_deliveries,
     }
 
 
@@ -105,6 +152,8 @@ def truck_simple_dict(truck: Any) -> Dict[str, Any]:
         "plate": getattr(truck, "plate", None),
         "status": getattr(truck, "status", None),
         "compartments": getattr(truck, "compartments", None) or [],
+        "current_driver_id": getattr(truck, "current_driver_id", None),
+        "driver_name": getattr(truck, "driver_name", None),
     }
 
 

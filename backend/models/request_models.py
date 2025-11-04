@@ -210,3 +210,27 @@ class TruckCreate(BasicModel):
         pattern="^(active|inactive|maintenance)$",
         description="Truck status",
     )
+
+
+# Dispatch execution - creates actual delivery records
+class ExecuteDispatchRequest(BasicModel):
+    """Request model for executing a dispatch (creates actual deliveries)"""
+
+    truck_id: str = Field(
+        ..., description="Truck identifier (code, ID, or truck-XXX format)"
+    )
+    station_ids: list[str] = Field(
+        ..., min_length=1, description="List of station IDs/codes to deliver to"
+    )
+    depot_location: str = Field(
+        default=DEFAULT_DEPOT_LOCATION, description="Starting depot location"
+    )
+    estimated_distance_km: Optional[float] = Field(
+        default=None, description="Total estimated distance in kilometers"
+    )
+    estimated_duration_minutes: Optional[int] = Field(
+        default=None, description="Total estimated duration in minutes"
+    )
+    notes: Optional[str] = Field(
+        default=None, description="Additional notes or special instructions"
+    )

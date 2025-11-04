@@ -10,6 +10,7 @@ from models.database_models import (
     TruckCompartment as CompartmentORM,
 )
 from models.data_models import StationData, TruckData
+from constants import DELIVERY_STATUS_ENROUTE
 
 
 def convert_compartment_to_dict(compartment: CompartmentORM) -> dict:
@@ -108,6 +109,7 @@ def convert_truck_orm_to_data(
     driver_hours_remaining = None
     driver_certifications = None
     current_driver_id = truck.current_driver_id
+    has_active_deliveries = False
 
     if hasattr(truck, "current_driver") and truck.current_driver:
         driver = truck.current_driver
@@ -115,6 +117,13 @@ def convert_truck_orm_to_data(
         driver_status = driver.status
         driver_hours_remaining = float(driver.max_hours_per_shift or 11.0)
         driver_certifications = driver.certifications
+
+    # Check for active deliveries if relationship is loaded
+    if hasattr(truck, "deliveries") and truck.deliveries:
+        active_statuses = [DELIVERY_STATUS_ENROUTE]
+        has_active_deliveries = any(
+            d.status in active_statuses for d in truck.deliveries
+        )
 
     return TruckData(
         id=truck.id,
@@ -132,6 +141,7 @@ def convert_truck_orm_to_data(
         driver_status=driver_status,
         driver_hours_remaining=driver_hours_remaining,
         driver_certifications=driver_certifications,
+        has_active_deliveries=has_active_deliveries,
         current_location=truck.current_location,
         last_maintenance_date=truck.last_maintenance_date,
         next_maintenance_date=truck.next_maintenance_date,
