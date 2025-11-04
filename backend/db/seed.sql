@@ -1,22 +1,63 @@
 USE manage_petro;
 
 -- Clear existing data (safe re-seeding)
+DELETE FROM driver_shifts WHERE id > 0;
 DELETE FROM weather_data WHERE id > 0;
 DELETE FROM station_fuel_levels WHERE id > 0;
 DELETE FROM deliveries WHERE id > 0;
 DELETE FROM truck_compartments WHERE id > 0;
 DELETE FROM trucks WHERE id > 0;
+DELETE FROM drivers WHERE id > 0;
 DELETE FROM stations WHERE id > 0;
 DELETE FROM users WHERE id > 0;
 
 -- Reset AUTO_INCREMENT counters
+ALTER TABLE driver_shifts AUTO_INCREMENT = 1;
 ALTER TABLE weather_data AUTO_INCREMENT = 1;
 ALTER TABLE station_fuel_levels AUTO_INCREMENT = 1;
 ALTER TABLE deliveries AUTO_INCREMENT = 1;
 ALTER TABLE truck_compartments AUTO_INCREMENT = 1;
 ALTER TABLE trucks AUTO_INCREMENT = 1;
+ALTER TABLE drivers AUTO_INCREMENT = 1;
 ALTER TABLE stations AUTO_INCREMENT = 1;
 ALTER TABLE users AUTO_INCREMENT = 1;
+
+-- =====================
+-- Drivers (~25 professional fuel truck drivers)
+-- =====================
+INSERT INTO drivers (employee_id, first_name, last_name, phone, email, license_number, license_class, license_expiry_date, hazmat_certified, hazmat_expiry_date, tanker_endorsement, years_experience, status, max_hours_per_shift, current_location, home_terminal, hourly_rate, certifications, hired_date, last_medical_exam, next_medical_exam) VALUES
+-- Toronto Drivers
+('DRV001','John','Martinez','416-555-0101','john.martinez@managepetro.com','ON-CDL-10234','A','2026-06-15',TRUE,'2026-03-20',TRUE,12,'active',11.00,'Toronto, ON','Toronto',35.50,'Class A CDL, HazMat, Tanker, FAST Card','2015-03-10','2024-08-15','2026-08-15'),
+('DRV002','Sarah','Chen','416-555-0102','sarah.chen@managepetro.com','ON-CDL-10891','A','2025-11-20',TRUE,'2025-09-10',TRUE,8,'active',11.00,'Toronto, ON','Toronto',32.75,'Class A CDL, HazMat, Tanker','2018-06-22','2024-05-10','2026-05-10'),
+('DRV003','Michael','Johnson','416-555-0103','michael.johnson@managepetro.com','ON-CDL-11456','A','2026-03-18',TRUE,'2026-01-05',TRUE,15,'active',11.00,'Toronto, ON','Toronto',38.00,'Class A CDL, HazMat, Tanker, FAST Card, Trainer','2012-01-15','2024-09-20','2026-09-20'),
+('DRV004','Emily','Rodriguez','416-555-0104','emily.rodriguez@managepetro.com','ON-CDL-12009','A','2025-08-25',TRUE,'2025-07-12',TRUE,6,'active',11.00,'Toronto, ON','Toronto',30.25,'Class A CDL, HazMat, Tanker','2020-02-10','2024-03-15','2026-03-15'),
+('DRV005','David','Singh','416-555-0105','david.singh@managepetro.com','ON-CDL-12567','A','2026-05-10',FALSE,NULL,TRUE,4,'active',11.00,'Toronto, ON','Toronto',28.50,'Class A CDL, Tanker','2021-11-05','2024-11-01','2026-11-01'),
+-- Vancouver Drivers
+('DRV006','Jessica','Wong','604-555-0201','jessica.wong@managepetro.com','BC-CDL-20145','A','2026-07-22',TRUE,'2026-04-15',TRUE,10,'active',11.00,'Vancouver, BC','Vancouver',34.75,'Class A CDL, HazMat, Tanker','2016-05-12','2024-06-20','2026-06-20'),
+('DRV007','Robert','Taylor','604-555-0202','robert.taylor@managepetro.com','BC-CDL-20678','A','2025-12-30',TRUE,'2025-10-20',TRUE,9,'active',11.00,'Vancouver, BC','Vancouver',33.50,'Class A CDL, HazMat, Tanker','2017-08-18','2024-07-10','2026-07-10'),
+('DRV008','Amanda','Lee','604-555-0203','amanda.lee@managepetro.com','BC-CDL-21234','A','2026-02-14',TRUE,'2025-12-05',TRUE,7,'active',11.00,'Vancouver, BC','Vancouver',31.75,'Class A CDL, HazMat, Tanker','2019-03-25','2024-04-12','2026-04-12'),
+('DRV009','Thomas','Brown','604-555-0204','thomas.brown@managepetro.com','BC-CDL-21789','A','2025-09-08',FALSE,NULL,TRUE,5,'on_leave',11.00,'Vancouver, BC','Vancouver',29.50,'Class A CDL, Tanker','2020-07-30','2024-02-18','2026-02-18'),
+-- Calgary Drivers
+('DRV010','Patricia','Anderson','403-555-0301','patricia.anderson@managepetro.com','AB-CDL-30234','A','2026-04-20',TRUE,'2026-02-10',TRUE,13,'active',11.00,'Calgary, AB','Calgary',36.25,'Class A CDL, HazMat, Tanker, Winter Driving','2014-09-15','2024-10-05','2026-10-05'),
+('DRV011','James','Wilson','403-555-0302','james.wilson@managepetro.com','AB-CDL-30678','A','2025-10-15',TRUE,'2025-08-20',TRUE,11,'active',11.00,'Calgary, AB','Calgary',35.00,'Class A CDL, HazMat, Tanker','2015-12-20','2024-08-25','2026-08-25'),
+('DRV012','Linda','Thompson','403-555-0303','linda.thompson@managepetro.com','AB-CDL-31123','A','2026-01-08',TRUE,'2025-11-15',TRUE,8,'active',11.00,'Calgary, AB','Calgary',32.50,'Class A CDL, HazMat, Tanker','2018-04-10','2024-06-30','2026-06-30'),
+-- Montreal Drivers
+('DRV013','Daniel','Dubois','514-555-0401','daniel.dubois@managepetro.com','QC-CDL-40156','A','2026-06-30',TRUE,'2026-03-25',TRUE,14,'active',11.00,'Montreal, QC','Montreal',37.00,'Class A CDL, HazMat, Tanker, Bilingual','2013-07-22','2024-09-10','2026-09-10'),
+('DRV014','Marie','Lavoie','514-555-0402','marie.lavoie@managepetro.com','QC-CDL-40589','A','2025-11-18',TRUE,'2025-09-05',TRUE,10,'active',11.00,'Montreal, QC','Montreal',34.50,'Class A CDL, HazMat, Tanker, Bilingual','2016-02-14','2024-05-20','2026-05-20'),
+('DRV015','Pierre','Gagnon','514-555-0403','pierre.gagnon@managepetro.com','QC-CDL-41012','A','2026-03-12',TRUE,'2026-01-08',TRUE,7,'active',11.00,'Montreal, QC','Montreal',31.50,'Class A CDL, HazMat, Tanker, Bilingual','2019-11-05','2024-04-15','2026-04-15'),
+-- Edmonton Drivers
+('DRV016','Christopher','Davis','780-555-0501','christopher.davis@managepetro.com','AB-CDL-50123','A','2025-12-20',TRUE,'2025-10-15',TRUE,9,'active',11.00,'Edmonton, AB','Edmonton',33.75,'Class A CDL, HazMat, Tanker','2017-05-18','2024-07-22','2026-07-22'),
+('DRV017','Nancy','Moore','780-555-0502','nancy.moore@managepetro.com','AB-CDL-50567','A','2026-02-28',TRUE,'2025-12-20',TRUE,12,'active',11.00,'Edmonton, AB','Edmonton',35.75,'Class A CDL, HazMat, Tanker, Winter Driving','2014-10-30','2024-08-18','2026-08-18'),
+-- Ottawa Drivers
+('DRV018','Kevin','Martin','613-555-0601','kevin.martin@managepetro.com','ON-CDL-60234','A','2026-05-15',TRUE,'2026-02-20',TRUE,6,'active',11.00,'Ottawa, ON','Ottawa',30.75,'Class A CDL, HazMat, Tanker','2020-06-12','2024-03-25','2026-03-25'),
+('DRV019','Michelle','Tremblay','613-555-0602','michelle.tremblay@managepetro.com','ON-CDL-60678','A','2025-09-22',TRUE,'2025-07-18',TRUE,8,'active',11.00,'Ottawa, ON','Ottawa',32.25,'Class A CDL, HazMat, Tanker, Bilingual','2018-08-20','2024-05-30','2026-05-30'),
+-- Additional Float Drivers (multi-terminal)
+('DRV020','Brian','Garcia','416-555-0701','brian.garcia@managepetro.com','ON-CDL-70145','A','2026-04-10',TRUE,'2026-01-15',TRUE,11,'active',11.00,'Toronto, ON','Toronto',35.25,'Class A CDL, HazMat, Tanker, Trainer','2015-09-08','2024-10-12','2026-10-12'),
+('DRV021','Angela','White','604-555-0702','angela.white@managepetro.com','BC-CDL-70589','A','2025-10-28',TRUE,'2025-08-15',TRUE,13,'active',11.00,'Vancouver, BC','Vancouver',36.50,'Class A CDL, HazMat, Tanker, FAST Card','2014-03-22','2024-09-05','2026-09-05'),
+('DRV022','Ryan','Campbell','403-555-0703','ryan.campbell@managepetro.com','AB-CDL-71012','A','2026-01-20',FALSE,NULL,TRUE,5,'active',11.00,'Calgary, AB','Calgary',29.75,'Class A CDL, Tanker','2021-02-15','2024-11-20','2026-11-20'),
+('DRV023','Stephanie','Clark','514-555-0704','stephanie.clark@managepetro.com','QC-CDL-71456','A','2025-11-05',TRUE,'2025-09-01',TRUE,9,'active',11.00,'Montreal, QC','Montreal',33.25,'Class A CDL, HazMat, Tanker, Bilingual','2017-06-30','2024-06-15','2026-06-15'),
+('DRV024','George','Lewis','780-555-0705','george.lewis@managepetro.com','AB-CDL-71890','A','2026-03-25',TRUE,'2026-01-10',TRUE,10,'active',11.00,'Edmonton, AB','Edmonton',34.25,'Class A CDL, HazMat, Tanker','2016-12-10','2024-07-08','2026-07-08'),
+('DRV025','Karen','Hall','613-555-0706','karen.hall@managepetro.com','ON-CDL-72234','A','2025-08-30',TRUE,'2025-06-22',TRUE,7,'inactive',11.00,'Ottawa, ON','Ottawa',31.25,'Class A CDL, HazMat, Tanker','2019-10-18','2024-04-28','2026-04-28');
 
 -- =====================
 -- Stations (~78, multiple per city CA + US)
@@ -128,39 +169,39 @@ INSERT INTO stations (code, name, lat, lon, city, region, fuel_type, capacity_li
 ('S080','Manage Petro - Washington DC',38.9072,-77.0369,'Washington','DC','diesel',98000,26000,'Manual',25000);
 
 -- =====================
--- Trucks (30)
+-- Trucks (30 trucks assigned to drivers)
 -- =====================
-INSERT INTO trucks (code, plate, capacity_liters, fuel_level_percent, fuel_type, status) VALUES
-('T01','AB-1421',32000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T02','BC-4422',30000,FLOOR(RAND()*50)+50,'gasoline','active'),
-('T03','QC-9832',31000,FLOOR(RAND()*50)+50,'diesel','maintenance'),
-('T04','ON-1742',34000,FLOOR(RAND()*50)+50,'propane','active'),
-('T05','MB-2344',29000,FLOOR(RAND()*50)+50,'diesel','offline'),
-('T06','AB-8732',31000,FLOOR(RAND()*50)+50,'gasoline','active'),
-('T07','NS-1289',33000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T08','ON-7742',30000,FLOOR(RAND()*50)+50,'propane','active'),
-('T09','WA-8811',40000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T10','CA-2211',36000,FLOOR(RAND()*50)+50,'gasoline','active'),
-('T11','TX-3344',42000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T12','NY-5566',38000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T13','FL-7788',30000,FLOOR(RAND()*50)+50,'gasoline','active'),
-('T14','IL-9900',37000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T15','CO-1122',45000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T16','AZ-3344',32000,FLOOR(RAND()*50)+50,'gasoline','active'),
-('T17','NV-5566',38000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T18','GA-7788',40000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T19','MO-9900',35000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T20','MN-1111',33000,FLOOR(RAND()*50)+50,'gasoline','active'),
-('T21','OH-2222',38000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T22','IN-3333',36000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T23','NC-4444',34000,FLOOR(RAND()*50)+50,'gasoline','active'),
-('T24','TN-5555',40000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T25','PA-6666',37000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T26','MI-7777',35000,FLOOR(RAND()*50)+50,'gasoline','active'),
-('T27','OR-8888',39000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T28','UT-9999',36000,FLOOR(RAND()*50)+50,'diesel','active'),
-('T29','MA-1234',34000,FLOOR(RAND()*50)+50,'gasoline','active'),
-('T30','WA-2345',38000,FLOOR(RAND()*50)+50,'diesel','active');
+INSERT INTO trucks (code, plate, capacity_liters, fuel_level_percent, fuel_type, status, current_driver_id, current_location, last_maintenance_date, next_maintenance_date) VALUES
+('T01','AB-1421',32000,FLOOR(RAND()*50)+50,'diesel','active',1,'Toronto, ON','2024-09-15','2025-03-15'),
+('T02','BC-4422',30000,FLOOR(RAND()*50)+50,'gasoline','active',2,'Toronto, ON','2024-08-20','2025-02-20'),
+('T03','QC-9832',31000,FLOOR(RAND()*50)+50,'diesel','maintenance',NULL,'Toronto Maintenance Bay','2024-10-28','2024-11-15'),
+('T04','ON-1742',34000,FLOOR(RAND()*50)+50,'propane','active',3,'Toronto, ON','2024-07-10','2025-01-10'),
+('T05','MB-2344',29000,FLOOR(RAND()*50)+50,'diesel','offline',NULL,'Toronto, ON','2024-06-05','2024-12-05'),
+('T06','AB-8732',31000,FLOOR(RAND()*50)+50,'gasoline','active',4,'Toronto, ON','2024-10-01','2025-04-01'),
+('T07','NS-1289',33000,FLOOR(RAND()*50)+50,'diesel','active',5,'Toronto, ON','2024-09-22','2025-03-22'),
+('T08','ON-7742',30000,FLOOR(RAND()*50)+50,'propane','active',6,'Vancouver, BC','2024-08-15','2025-02-15'),
+('T09','WA-8811',40000,FLOOR(RAND()*50)+50,'diesel','active',7,'Vancouver, BC','2024-10-10','2025-04-10'),
+('T10','CA-2211',36000,FLOOR(RAND()*50)+50,'gasoline','active',8,'Vancouver, BC','2024-07-28','2025-01-28'),
+('T11','TX-3344',42000,FLOOR(RAND()*50)+50,'diesel','active',10,'Calgary, AB','2024-09-05','2025-03-05'),
+('T12','NY-5566',38000,FLOOR(RAND()*50)+50,'diesel','active',11,'Calgary, AB','2024-10-12','2025-04-12'),
+('T13','FL-7788',30000,FLOOR(RAND()*50)+50,'gasoline','active',12,'Calgary, AB','2024-08-30','2025-02-28'),
+('T14','IL-9900',37000,FLOOR(RAND()*50)+50,'diesel','active',13,'Montreal, QC','2024-09-18','2025-03-18'),
+('T15','CO-1122',45000,FLOOR(RAND()*50)+50,'diesel','active',14,'Montreal, QC','2024-10-05','2025-04-05'),
+('T16','AZ-3344',32000,FLOOR(RAND()*50)+50,'gasoline','active',15,'Montreal, QC','2024-07-22','2025-01-22'),
+('T17','NV-5566',38000,FLOOR(RAND()*50)+50,'diesel','active',16,'Edmonton, AB','2024-09-10','2025-03-10'),
+('T18','GA-7788',40000,FLOOR(RAND()*50)+50,'diesel','active',17,'Edmonton, AB','2024-10-20','2025-04-20'),
+('T19','MO-9900',35000,FLOOR(RAND()*50)+50,'diesel','active',18,'Ottawa, ON','2024-08-25','2025-02-25'),
+('T20','MN-1111',33000,FLOOR(RAND()*50)+50,'gasoline','active',19,'Ottawa, ON','2024-09-30','2025-03-30'),
+('T21','OH-2222',38000,FLOOR(RAND()*50)+50,'diesel','active',20,'Toronto, ON','2024-10-15','2025-04-15'),
+('T22','IN-3333',36000,FLOOR(RAND()*50)+50,'diesel','active',21,'Vancouver, BC','2024-07-18','2025-01-18'),
+('T23','NC-4444',34000,FLOOR(RAND()*50)+50,'gasoline','active',22,'Calgary, AB','2024-09-08','2025-03-08'),
+('T24','TN-5555',40000,FLOOR(RAND()*50)+50,'diesel','active',23,'Montreal, QC','2024-10-22','2025-04-22'),
+('T25','PA-6666',37000,FLOOR(RAND()*50)+50,'diesel','active',24,'Edmonton, AB','2024-08-12','2025-02-12'),
+('T26','MI-7777',35000,FLOOR(RAND()*50)+50,'gasoline','active',NULL,'Calgary, AB','2024-09-25','2025-03-25'),
+('T27','OR-8888',39000,FLOOR(RAND()*50)+50,'diesel','active',NULL,'Vancouver, BC','2024-10-08','2025-04-08'),
+('T28','UT-9999',36000,FLOOR(RAND()*50)+50,'diesel','active',NULL,'Toronto, ON','2024-07-30','2025-01-30'),
+('T29','MA-1234',34000,FLOOR(RAND()*50)+50,'gasoline','active',NULL,'Montreal, QC','2024-09-15','2025-03-15'),
+('T30','WA-2345',38000,FLOOR(RAND()*50)+50,'diesel','active',NULL,'Edmonton, AB','2024-10-18','2025-04-18');
 
 -- =====================
 -- Truck compartments (2 per truck)

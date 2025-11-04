@@ -46,6 +46,11 @@ function DispatchRecommendationCard({
             <h3 className="text-lg font-bold text-gray-900">
               {recommendation.truck_code}
             </h3>
+            {recommendation.truck_plate && (
+              <p className="text-sm text-gray-600">
+                {recommendation.truck_plate}
+              </p>
+            )}
             <span
               className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getPriorityBadgeColor(
                 recommendation.priority
@@ -57,6 +62,30 @@ function DispatchRecommendationCard({
         </div>
         <SparklesIcon className="w-6 h-6 text-blue-600" />
       </div>
+
+      {/* Driver Information */}
+      {recommendation.driver_name && (
+        <div className="mb-4 bg-white rounded-lg p-3 border border-gray-200">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+              <span className="text-sm font-semibold text-green-600">
+                {recommendation.driver_name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div>
+              <div className="text-sm font-medium text-gray-900">
+                {recommendation.driver_name}
+              </div>
+              {recommendation.driver_hours_remaining !== undefined && (
+                <div className="text-xs text-gray-600">
+                  {recommendation.driver_hours_remaining.toFixed(1)}h remaining
+                  today
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">

@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import datetime
 from typing import List
+from constants import DEFAULT_FUEL_CONSUMPTION_RATE
 from models.data_models import (
     StationData,
     DeliveryData,
@@ -8,6 +9,7 @@ from models.data_models import (
     TruckData,
     WeatherData,
 )
+from constants import TIME_MODE_DEPARTURE, DEFAULT_VEHICLE_TYPE
 
 
 class PromptService:
@@ -44,9 +46,9 @@ class PromptService:
         # Handle time parameters
         departure_time = kwargs.get("departure_time", "Not specified")
         arrival_time = kwargs.get("arrival_time", "Not specified")
-        time_mode = kwargs.get("time_mode", "departure")
+        time_mode = kwargs.get("time_mode", TIME_MODE_DEPARTURE)
         delivery_date = kwargs.get("delivery_date", "Not specified")
-        vehicle_type = kwargs.get("vehicle_type", "fuel_delivery_truck")
+        vehicle_type = kwargs.get("vehicle_type", DEFAULT_VEHICLE_TYPE)
         notes = kwargs.get("notes", "No additional notes")
 
         # Format additional context
@@ -136,10 +138,10 @@ class PromptService:
 
         # Format compartments info
         compartments_text = self._format_compartments_data(truck)
-        
+
         # Format stations info
         stations_text = self._format_dispatch_stations_data(stations)
-        
+
         # Format depot weather
         weather_text = f"{depot_weather.condition}, {depot_weather.temp_c}°C, Wind: {depot_weather.wind_kph} km/h"
 
@@ -149,7 +151,8 @@ class PromptService:
             "truck_status": truck.status,
             "truck_fuel_level": truck.truck_fuel_level_percent or 80,
             "cargo_fuel_level": truck.fuel_level_percent,
-            "truck_consumption_rate": truck.fuel_consumption_rate or 35.0,
+            "truck_consumption_rate": truck.fuel_consumption_rate
+            or DEFAULT_FUEL_CONSUMPTION_RATE,
             "truck_efficiency": truck.efficiency_rating,
             "truck_range": f"{truck.max_range_km:.1f}",
             "compartments_info": compartments_text,
@@ -169,12 +172,16 @@ class PromptService:
         if truck.compartments:
             formatted = ""
             for comp in truck.compartments:
-                utilization = int((comp['current_level_liters'] / comp['capacity_liters']) * 100)
+                utilization = int(
+                    (comp["current_level_liters"] / comp["capacity_liters"]) * 100
+                )
                 formatted += f"  - Compartment {comp['compartment_number']}: {comp['fuel_type']} - "
                 formatted += f"{comp['capacity_liters']} L capacity ({comp['current_level_liters']} L current, {utilization}% utilized)\n"
             return formatted.rstrip()
         else:
-            return f"  - Single compartment: {truck.fuel_type} - {truck.capacity_liters} L"
+            return (
+                f"  - Single compartment: {truck.fuel_type} - {truck.capacity_liters} L"
+            )
 
     def _format_dispatch_stations_data(self, stations: List[StationData]) -> str:
         """Format stations needing fuel for dispatch"""
@@ -185,15 +192,17 @@ class PromptService:
         for i, station in enumerate(stations, 1):
             fuel_percent = station.fuel_level_percent
             needed = station.capacity_liters - station.current_level_liters
-            
+
             # Find nearby stations within 50 km
             nearby = []
             for other in stations:
                 if other.id != station.id:
                     distance = station.distance_to(other)
                     if distance <= 50:
-                        nearby.append(f"{other.name} ({other.code}) - {distance:.1f} km, {other.priority_level} priority")
-            
+                        nearby.append(
+                            f"{other.name} ({other.code}) - {distance:.1f} km, {other.priority_level} priority"
+                        )
+
             formatted += f"""
 {i}. {station.name} ({station.code})
    - Location: {station.city}, {station.region}
@@ -204,12 +213,12 @@ class PromptService:
    - Needed: {needed} L
    - Priority: {station.priority_level}
    - Request Method: {station.request_method}"""
-            
+
             if nearby:
                 formatted += f"\n   - Nearby Stations (within 50 km): {'; '.join(nearby[:3])}"  # Show up to 3 nearby
-            
+
             formatted += "\n"
-        
+
         return formatted.rstrip()
 
     def format_batch_dispatch_prompt(
@@ -225,10 +234,10 @@ class PromptService:
 
         # Format trucks info
         trucks_text = self._format_trucks_summary(trucks)
-        
+
         # Format stations info
         stations_text = self._format_dispatch_stations_data(stations)
-        
+
         # Format depot weather
         weather_text = f"{depot_weather.condition}, {depot_weather.temp_c}°C, Wind: {depot_weather.wind_kph} km/h"
 
@@ -249,24 +258,43 @@ class PromptService:
         return formatted_prompt
 
     def _format_trucks_summary(self, trucks: List[TruckData]) -> str:
-        """Format truck summary for batch recommendations"""
+        """Format truck summary for batch recommendations with driver information"""
         if not trucks:
             return "No active trucks available."
-        
+
         formatted = ""
         for truck in trucks:
             formatted += f"\n{truck.code} ({truck.plate})"
             formatted += f"\n   - Status: {truck.status}"
+
+            # Driver information
+            if truck.driver_name:
+                formatted += f"\n   - Driver: {truck.driver_name}"
+                if truck.driver_hours_remaining:
+                    formatted += (
+                        f" ({truck.driver_hours_remaining:.1f}h remaining today)"
+                    )
+                if truck.driver_certifications:
+                    formatted += f"\n   - Driver Certs: {truck.driver_certifications}"
+            else:
+                formatted += f"\n   - Driver: UNASSIGNED (needs driver assignment)"
+
+            # Location
+            if truck.current_location:
+                formatted += f"\n   - Location: {truck.current_location}"
+
             formatted += f"\n   - Fuel Level: {truck.fuel_level_percent}%"
-            
+
             if truck.compartments:
                 formatted += f"\n   - Compartments: {len(truck.compartments)}"
                 for comp in truck.compartments:
-                    utilization = int((comp['current_level_liters'] / comp['capacity_liters']) * 100)
+                    utilization = int(
+                        (comp["current_level_liters"] / comp["capacity_liters"]) * 100
+                    )
                     formatted += f"\n     • Compartment {comp['compartment_number']}: {comp['fuel_type']} - {comp['current_level_liters']}/{comp['capacity_liters']} L ({utilization}%)"
             else:
                 formatted += f"\n   - Single Compartment: {truck.fuel_type} - {truck.capacity_liters} L"
-            
+
             formatted += "\n"
-        
+
         return formatted.strip()
