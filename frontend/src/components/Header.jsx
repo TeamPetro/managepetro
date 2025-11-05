@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   ChevronDownIcon,
   Bars3Icon,
@@ -11,7 +11,6 @@ import {
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import managePetroLogo from "../assets/manage-petro-logo.png";
-import managePetroLogoDark from "../assets/darkManagePetroLogo.png";
 import { LLM_MODELS } from "../constants/config";
 
 
@@ -34,32 +33,13 @@ const pageConfig = {
       "/dashboard": { showLLMDropdown: false, showHeaderContent: false },
 };
 
-function Header({ selectedLLM, onLLMChange }) {
+function Header({ selectedLLM, onLLMChange, darkMode, toggleDarkMode }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const { user, logout } = useAuth();
   const location = useLocation();
   const currentPageConfig = pageConfig[location.pathname] || {};
-  const [darkMode, setDarkMode] = useState(() => {
-        const savedMode = localStorage.getItem('darkMode');
-        // Initialize based on saved preference, or default to true/dark as in your request
-        return savedMode !== null ? JSON.parse(savedMode) : true; 
-    });
-
-    const toggleDarkMode = () => {
-        setDarkMode(prevMode => !prevMode);
-    }
-  useEffect(() => {
-        const root = document.documentElement;
-        if (darkMode) {
-            root.classList.add('dark');
-        } else {
-            root.classList.remove('dark');
-        }
-        // Save the preference
-        localStorage.setItem('darkMode', JSON.stringify(darkMode));
-    }, [darkMode]);  
 
   const selectedOption = llmOptions.find(
     (option) => option.value === selectedLLM
@@ -85,12 +65,12 @@ function Header({ selectedLLM, onLLMChange }) {
 
   return (
     <>
-      <header className={`p-2 -full font-medium text-xs transition-colors border hidden sm:block ${darkMode
-              ? "bg-gray-700 text-white border-gray-600"
-              : "bg-gray-100 text-gray-800 border-gray-200"}`}>
-      <header className={`p-2 -full font-medium text-xs transition-colors border hidden sm:block ${darkMode
-              ? "bg-gray-700 text-white border-gray-600"
-              : "bg-gray-100 text-gray-800 border-gray-200"}`}>
+      <header className={`p-2 -full font-medium text-xs transition-colors border hidden sm:block 
+      ${darkMode
+              ? "bg-gray-900 text-gray-800 border-gray-900"
+              : "bg-slate-500 text-white border-slate-500"
+            }
+              `}>
         <div className="container mx-auto px-3 sm:px-4 lg:px-6">
           <div className="flex justify-between h-16 sm:h-20">
             {/* Logo - Responsive width (always visible) */}
@@ -101,20 +81,22 @@ function Header({ selectedLLM, onLLMChange }) {
                 onClick={closeMobileMenu}
               >
                 {/* Logo with consistent brand colors */}
-                <div className="w-28 h-12 sm:w-32 sm:h-14 md:w-36 md:h-14 lg:w-40 lg:h-16 drop-shadow">
-                  {darkMode ? (// Show the dark mode optimized logo when darkMode is true
-                    <img
-                      src={managePetroLogo}
-                      alt="Manage Petro Light"
-                      className="w-full h-full object-contain"
-                    />) 
-                    : (// Show the standard logo when darkMode is false (Light Mode)
+                <div className="w-28 h-12 sm:w-32 sm:h-14 md:w-36 md:h-14 lg:w-40 lg:h-16 drop-shadow-xl">
+                  {/* {darkMode ? (// Show the dark mode optimized logo when darkMode is true
                       <img
                         src={managePetroLogoDark}
                         alt="Manage Petro Dark"
                         className="w-full h-full object-contain"
-                      />)}
-
+                      />
+                    ) 
+                    : (// Show the standard logo when darkMode is false (Light Mode) */}
+                      <img
+                      src={managePetroLogo}
+                      alt="Manage Petro Light"
+                      className="w-full h-full object-contain"
+                    />
+                    {/* )} */}
+                 
                 </div>
               </Link>
             </div>
@@ -134,7 +116,7 @@ function Header({ selectedLLM, onLLMChange }) {
                 : "text-orange-500 hover:text-orange-300"    
               : darkMode
                 ? "text-white hover:text-orange-300"         
-                : "text-gray-700 hover:text-gray-500"    
+                : "text-white hover:text-orange-300"    
           }`}
         >
           Route Optimization
@@ -148,7 +130,7 @@ function Header({ selectedLLM, onLLMChange }) {
                 : "text-orange-500 hover:text-orange-300"    
               : darkMode
                 ? "text-white hover:text-orange-300"         
-                : "text-gray-700 hover:text-gray-500"      
+                : "text-white hover:text-orange-300"       
           }`}
         >
           Dispatcher
@@ -162,7 +144,7 @@ function Header({ selectedLLM, onLLMChange }) {
                 : "text-orange-500 hover:text-orange-300"    
               : darkMode
                 ? "text-white hover:text-orange-300"         
-                : "text-gray-700 hover:text-gray-500"    
+                : "text-white hover:text-orange-300"     
           }`}
         >
           Stations
@@ -206,9 +188,11 @@ function Header({ selectedLLM, onLLMChange }) {
                   onClick={() => handleLLMChange(option.value)}
                   className={`w-full text-left px-4 py-2 text-sm transition-colors ${
                     selectedLLM === option.value
-                      ? "text-orange-500 hover:text-orange-300 bg-blue-50"
+                      ? darkMode 
+                        ? "text-orange-500 hover:text-orange-300 bg-blue-50"
+                        : "text-orange-500 hover:text-orange-300 bg-slate-800" 
                       : darkMode
-                        ? "text-gray-700 hover:bg-gray-100"
+                        ? "text-gray-700 hover:bg-gray-100"      
                         : "text-white hover:bg-gray-800"
                   }`}
                 >
@@ -267,7 +251,7 @@ function Header({ selectedLLM, onLLMChange }) {
             </div>
           )}
         </div>
-
+          
         {/* Dark Mode Toggle */}
         <div
           className={`relative flex items-center w-16 h-8 rounded-full cursor-pointer p-1 transition-colors duration-300 ${
@@ -277,7 +261,7 @@ function Header({ selectedLLM, onLLMChange }) {
         >
           <div
             className={`absolute w-6 h-6 rounded-full shadow-md transition-all duration-300 ease-in-out flex items-center justify-center z-10 ${
-              darkMode ? "bg-white" : "transform translate-x-7 bg-gray-800"
+              darkMode ? "bg-gray-100" : "transform translate-x-7 bg-gray-800"
             }`}
           >
             {darkMode ? (
