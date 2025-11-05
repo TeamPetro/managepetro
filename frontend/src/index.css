@@ -1,1 +1,74 @@
 @import "tailwindcss";
+@tailwind utilities;
+
+
+@layer base {
+    body {
+        @apply bg-gray-50 text-gray-900;
+    }
+
+    html.dark body {
+        @apply bg-slate-800 text-gray-50;
+    }
+}
+
+/* Dark-mode utility overrides
+   These override common Tailwind classes when html.dark is present so you don't
+   have to edit every page/component. Add more mappings if you see elements that
+   still look out-of-place in dark mode.
+*/
+html.dark {
+  /* Override common background utilities */
+  --bg-white: #0f1724;         /* used in place of bg-white */
+  --bg-gray-50: #0b1220;
+  --bg-blue-50: #071428;
+  --bg-purple-50: #0b0b1a;
+  --bg-red-50: #1a0b0b;
+
+  /* Override common text utilities */
+  --text-gray-900: #f8fafc;
+  --text-gray-700: #d1d5db;
+  --text-gray-600: #9ca3af;
+  --text-gray-500: #9ca3af;
+
+  /* Override common border utilities */
+  --border-gray-200: #374151;
+  --border-gray-300: #4b5563;
+  --border-gray-600: #1f2937;
+}
+
+/* Map Tailwind utility classes to dark colors when html.dark is active.
+   These are intentionally specific and small in number — add more selectors
+   if more utilities are used across the app and require dark equivalents.
+*/
+html.dark .bg-white { background-color: var(--bg-white) !important; }
+html.dark .bg-gray-50 { background-color: var(--bg-gray-50) !important; }
+html.dark .bg-blue-50 { background-color: var(--bg-blue-50) !important; }
+html.dark .bg-purple-50 { background-color: var(--bg-purple-50) !important; }
+html.dark .bg-red-50 { background-color: var(--bg-red-50) !important; }
+
+html.dark .text-gray-900 { color: var(--text-gray-900) !important; }
+html.dark .text-gray-700 { color: var(--text-gray-700) !important; }
+html.dark .text-gray-600 { color: var(--text-gray-600) !important; }
+html.dark .text-gray-500 { color: var(--text-gray-500) !important; }
+
+html.dark .border-gray-200 { border-color: var(--border-gray-200) !important; }
+html.dark .border-gray-300 { border-color: var(--border-gray-300) !important; }
+html.dark .border-gray-600 { border-color: var(--border-gray-600) !important; }
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #0b1220;
+  color: var(--text-gray-900);
+  border-color: var(--border-gray-300);
+}
+
+/* Small helper: invert light bg utilities commonly used for cards/panels */
+html.dark .bg-white.rounded-lg,
+html.dark .bg-white.shadow,
+html.dark .bg-white.p-4,
+html.dark .bg-white.p-6,
+html.dark .bg-white.p-8 {
+  background-color: #0b1220 !important;
+}

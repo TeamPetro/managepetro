@@ -308,7 +308,7 @@ function ImprovedDispatcherPage() {
           <div>
             <div className="flex items-center space-x-3 mb-2">
               <SparklesIcon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">   
                 AI-Powered Dispatch Center
               </h1>
             </div>
@@ -380,7 +380,7 @@ function ImprovedDispatcherPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
               <FunnelIcon className="w-5 h-5 text-purple-600" />
-              <h3 className="text-sm font-semibold text-gray-900">
+              <h3 className="text-sm font-semibold text-gray-800">
                 Filter by Region or City
               </h3>
             </div>

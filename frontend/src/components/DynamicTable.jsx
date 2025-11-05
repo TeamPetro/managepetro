@@ -71,7 +71,7 @@ function DynamicTable({ data, columns, onFilter, showFilters = true }) {
               className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 px-3 sm:px-4 py-2 rounded-lg transition-colors"
             >
               <FunnelIcon className="w-4 h-4 text-gray-600" />
-              <span className="text-xs sm:text-sm font-medium text-gray-700">Filters</span>
+              <span className="text-xs sm:text-sm font-medium text-zinc-700">Filters</span>
             </button>
           </div>
         </div>
