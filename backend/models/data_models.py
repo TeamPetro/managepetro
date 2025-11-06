@@ -8,6 +8,7 @@ from constants import (
     DEFAULT_TRUCK_FUEL_TANK_LITERS,
     DEFAULT_TRUCK_FUEL_LEVEL_PERCENT,
 )
+from utils.serializers import truck_api_dict
 
 
 @dataclass
@@ -410,7 +411,8 @@ class RouteOptimizationResponse:
         recent_deliveries = [
             delivery.to_api_dict() for delivery in db_data.deliveries[:5]
         ]
-        available_trucks = [truck.to_api_dict() for truck in db_data.trucks[:3]]
+
+        available_trucks = [truck_api_dict(truck) for truck in db_data.trucks[:3]]
 
         # Data sources
         data_sources = {
