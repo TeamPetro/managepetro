@@ -5,7 +5,7 @@
  */
 
 import axios from "axios";
-import { getApiBaseUrl, API_TIMEOUT } from "../config/env";
+import { getApiBaseUrl, API_BASE_URL, API_TIMEOUT } from "../config/env";
 
 /**
  * Axios instance configured for the FastAPI backend
@@ -125,5 +125,27 @@ export const httpClient = {
 
 /**
  * Raw axios instance for auth endpoints that bypass the /api prefix
+ * Configured with proper baseURL and timeout to avoid network errors
  */
-export const rawAxios = axios;
+export const rawAxios = axios.create({
+  baseURL: API_BASE_URL, // Use the raw API_BASE_URL without /api suffix
+  timeout: API_TIMEOUT,
+});
+
+// Add error normalization for rawAxios (for auth endpoints)
+rawAxios.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const status = err.response?.status;
+    const message =
+      err.response?.data?.detail ||
+      err.response?.data?.error ||
+      err.message ||
+      "Request failed";
+    /** @type {ApiError} */
+    const wrapped = new Error(message);
+    wrapped.status = status;
+    wrapped.data = err.response?.data;
+    return Promise.reject(wrapped);
+  }
+);

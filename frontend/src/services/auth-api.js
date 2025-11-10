@@ -5,7 +5,6 @@
  */
 
 import { rawAxios } from "./http-client";
-import { API_BASE_URL } from "../config/env";
 
 /**
  * Types from auto-generated API schema
@@ -24,7 +23,7 @@ export async function login(username, password) {
   const formData = new FormData();
   formData.append("username", username);
   formData.append("password", password);
-  const response = await rawAxios.post(`${API_BASE_URL}/auth/token`, formData);
+  const response = await rawAxios.post("/auth/token", formData);
   return response.data;
 }
 
@@ -35,7 +34,7 @@ export async function login(username, password) {
  */
 export function register(userData) {
   return rawAxios
-    .post(`${API_BASE_URL}/auth/register`, userData)
+    .post("/auth/register", userData)
     .then((r) => r.data);
 }
 
@@ -45,7 +44,7 @@ export function register(userData) {
  */
 export function me() {
   return rawAxios
-    .get(`${API_BASE_URL}/auth/me`, {
+    .get("/auth/me", {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     })
     .then((r) => r.data);
@@ -58,7 +57,7 @@ export function me() {
 export function logout() {
   return rawAxios
     .post(
-      `${API_BASE_URL}/auth/logout`,
+      "/auth/logout",
       {},
       {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
