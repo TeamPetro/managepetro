@@ -5,6 +5,7 @@ This module provides async database connectivity using SQLAlchemy 2.0
 with proper connection pooling and session management for FastAPI.
 """
 
+from fastapi import HTTPException
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -14,13 +15,11 @@ from sqlalchemy.ext.asyncio import (
 )
 from models.database_models import Base
 from config import config
+import os
 
 
 class DatabaseManager:
     """Manages SQLAlchemy async database connections and sessions."""
-
-
-import os
 
 
 class DatabaseManager:
@@ -136,9 +135,14 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
             yield session
             logger.debug("get_db_session: Endpoint completed successfully")
         except Exception as e:
-            logger.error(
-                f"get_db_session: Exception during session: {type(e).__name__}: {str(e)}",
-                exc_info=True,
-            )
+            # Don't log expected auth failures (401) at ERROR level
+
+            if isinstance(e, HTTPException) and e.status_code == 401:
+                logger.debug(f"get_db_session: Auth failure (expected): {e.detail}")
+            else:
+                logger.error(
+                    f"get_db_session: Exception during session: {type(e).__name__}: {str(e)}",
+                    exc_info=True,
+                )
             await session.rollback()
             raise
