@@ -39,7 +39,6 @@ from models.request_models import (
 from models.data_models import DriverData, DriverShiftData
 from database import get_db_session
 from config import config
-from constants import CORS_ORIGINS
 from models.database_models import (
     Truck as TruckORM,
     Station as StationORM,
@@ -73,13 +72,24 @@ async def healthz():
 # Configure logging early
 configure_logging()
 
+# Log CORS configuration for debugging
+_logger.info(f"Configuring CORS with {len(config.CORS_ORIGINS)} allowed origins")
+for origin in config.CORS_ORIGINS:
+    _logger.debug(f"  - Allowed origin: {origin}")
+if config.CORS_ORIGIN_REGEX:
+    _logger.info(f"CORS origin regex pattern: {config.CORS_ORIGIN_REGEX}")
+
 # Configure CORS
+# Use CORS origins from config (supports environment variables) for better production flexibility
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=config.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
+    allow_origin_regex=config.CORS_ORIGIN_REGEX,  # Support for dynamic URLs (e.g., Vercel previews)
 )
 
 # Initialize services
