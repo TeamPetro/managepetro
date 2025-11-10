@@ -55,6 +55,12 @@ app = FastAPI(
     title="Manage Petro API",
     description="API for managing fuel delivery operations with AI-powered route optimization",
     version="1.0.0",
+    
+origins = [
+    "https://manage-petro-frontend.vercel.app",  # your Vercel site
+    "http://localhost:5173",                      # local dev
+]
+
 )
 
 
