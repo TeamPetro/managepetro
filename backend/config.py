@@ -75,12 +75,12 @@ class Config:
         
         # OpenAI (optional)
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-
+        
         # Anthropic (optional)
         self.ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
-
-        # DeepSeek (optional) – OpenAI-compatible API
-        self.DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
+        
+        # Groq (optional - free tier available)
+        self.GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 
         # Database Configuration (Required)
         self.DB_HOST = os.getenv("DB_HOST", "").strip()
@@ -130,6 +130,8 @@ class Config:
         self.WEATHER_CITY = os.getenv("WEATHER_CITY", "Vancouver").strip()
         # Logging level for the application
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+        # Default LLM model
+        self.DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "gemini-2.5-flash").strip()
 
         # If any required variables are missing, raise a clear error
         if missing_vars:
