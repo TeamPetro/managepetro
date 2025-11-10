@@ -148,6 +148,11 @@ class Config:
                 "http://localhost:5173",  # Vite dev server
                 "https://manage-petro-frontend.vercel.app",  # Production frontend
             ]
+        
+        # CORS Origin Regex Pattern (optional)
+        # Supports regex patterns for dynamic URLs (e.g., Vercel preview deployments)
+        # Example: r"https://.*\.vercel\.app" to allow all Vercel preview URLs
+        self.CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", "").strip() or None
 
         # If any required variables are missing, raise a clear error
         if missing_vars:

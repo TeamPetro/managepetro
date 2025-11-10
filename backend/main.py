@@ -82,6 +82,7 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,  # Cache preflight requests for 1 hour
+    allow_origin_regex=config.CORS_ORIGIN_REGEX,  # Support for dynamic URLs (e.g., Vercel previews)
 )
 
 # Initialize services
