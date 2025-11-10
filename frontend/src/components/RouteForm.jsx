@@ -340,7 +340,7 @@ function RouteForm({ onSubmit, isLoading = false }) {
           <button
             type="submit"
             disabled={!from.trim() || !to.trim() || isLoading}
-            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg text-sm sm:text-base font-medium transition-colors"
+            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-500 disabled:cursor-not-allowed text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg text-sm sm:text-base font-medium transition-colors"
           >
             {isLoading ? (
               <>
