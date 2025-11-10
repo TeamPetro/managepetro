@@ -30,8 +30,8 @@ const RegisterForm = ({ onSuccess, onSwitchToLogin }) => {
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters long");
+    if (formData.password.length < 8) {
+      setError("Password must be at least 8 characters long");
       return;
     }
 
@@ -97,9 +97,9 @@ const RegisterForm = ({ onSuccess, onSwitchToLogin }) => {
           type="password"
           value={formData.password}
           onChange={handleChange}
-          placeholder="Choose a password (min 6 characters)"
+          placeholder="Choose a password (min 8 characters)"
           required
-          minLength={6}
+          minLength={8}
           disabled={loading}
         />
 
