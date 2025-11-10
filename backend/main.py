@@ -72,6 +72,13 @@ async def healthz():
 # Configure logging early
 configure_logging()
 
+# Log CORS configuration for debugging
+_logger.info(f"Configuring CORS with {len(config.CORS_ORIGINS)} allowed origins")
+for origin in config.CORS_ORIGINS:
+    _logger.debug(f"  - Allowed origin: {origin}")
+if config.CORS_ORIGIN_REGEX:
+    _logger.info(f"CORS origin regex pattern: {config.CORS_ORIGIN_REGEX}")
+
 # Configure CORS
 # Use CORS origins from config (supports environment variables) for better production flexibility
 app.add_middleware(
