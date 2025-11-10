@@ -48,15 +48,10 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.current_timestamp(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=func.current_timestamp(),
-        onupdate=func.current_timestamp(),
-        nullable=False,
-    )
+    # Timestamps are set by application code (auth_service) for PostgreSQL/MySQL compatibility
+    # Using func.current_timestamp() causes issues with PostgreSQL timezone handling
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     # Indexes for performance
     __table_args__ = (
@@ -84,7 +79,13 @@ class Driver(Base):
     tanker_endorsement: Mapped[bool] = mapped_column(Boolean, default=False)
     years_experience: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(
-        Enum("active", "on_leave", "inactive", name="driver_status_enum"),
+        Enum(
+            "active",
+            "on_leave",
+            "inactive",
+            name="driver_status_enum",
+            native_enum=False,
+        ),
         default="active",
     )
     max_hours_per_shift: Mapped[Optional[float]] = mapped_column(
@@ -98,15 +99,9 @@ class Driver(Base):
     hired_date: Mapped[Optional[date]] = mapped_column(Date)
     last_medical_exam: Mapped[Optional[date]] = mapped_column(Date)
     next_medical_exam: Mapped[Optional[date]] = mapped_column(Date)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.current_timestamp(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=func.current_timestamp(),
-        onupdate=func.current_timestamp(),
-        nullable=False,
-    )
+    # Timestamps should be set by application code for PostgreSQL/MySQL compatibility
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     @property
     def full_name(self) -> str:
@@ -145,13 +140,14 @@ class Station(Base):
     city: Mapped[Optional[str]] = mapped_column(String(100))
     region: Mapped[Optional[str]] = mapped_column(String(100))
     fuel_type: Mapped[str] = mapped_column(
-        Enum("diesel", "gasoline", "propane", name="fuel_type_enum"),
+        Enum("diesel", "gasoline", "propane", name="fuel_type_enum", native_enum=False),
         default=DEFAULT_FUEL_TYPE,
     )
     capacity_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
     current_level_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
     request_method: Mapped[str] = mapped_column(
-        Enum("IoT", "Manual", name="request_method_enum"), default=REQUEST_METHOD_MANUAL
+        Enum("IoT", "Manual", name="request_method_enum", native_enum=False),
+        default=REQUEST_METHOD_MANUAL,
     )
     low_fuel_threshold: Mapped[Optional[float]] = mapped_column(
         DECIMAL(12, 2), default=DEFAULT_LOW_FUEL_THRESHOLD
@@ -177,11 +173,23 @@ class Truck(Base):
     capacity_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
     fuel_level_percent: Mapped[Optional[int]] = mapped_column(Integer)
     fuel_type: Mapped[str] = mapped_column(
-        Enum("diesel", "gasoline", "propane", name="truck_fuel_type_enum"),
+        Enum(
+            "diesel",
+            "gasoline",
+            "propane",
+            name="truck_fuel_type_enum",
+            native_enum=False,
+        ),
         default=DEFAULT_FUEL_TYPE,
     )
     status: Mapped[str] = mapped_column(
-        Enum("active", "maintenance", "offline", name="truck_status_enum"),
+        Enum(
+            "active",
+            "maintenance",
+            "offline",
+            name="truck_status_enum",
+            native_enum=False,
+        ),
         default=TRUCK_STATUS_ACTIVE,
     )
     current_driver_id: Mapped[Optional[int]] = mapped_column(
@@ -230,7 +238,12 @@ class Delivery(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text)
     status: Mapped[str] = mapped_column(
         Enum(
-            "planned", "enroute", "delivered", "canceled", name="delivery_status_enum"
+            "planned",
+            "enroute",
+            "delivered",
+            "canceled",
+            name="delivery_status_enum",
+            native_enum=False,
         ),
         default=DELIVERY_STATUS_PLANNED,
     )
@@ -263,9 +276,8 @@ class StationFuelLevel(Base):
     station_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("stations.id", ondelete="CASCADE")
     )
-    recorded_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.current_timestamp()
-    )
+    # recorded_at should be set by application code for PostgreSQL/MySQL compatibility
+    recorded_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     fuel_level_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
 
     # Relationships
@@ -285,7 +297,13 @@ class TruckCompartment(Base):
     )
     compartment_number: Mapped[int] = mapped_column(Integer, nullable=False)
     fuel_type: Mapped[str] = mapped_column(
-        Enum("diesel", "gasoline", "propane", name="compartment_fuel_type_enum"),
+        Enum(
+            "diesel",
+            "gasoline",
+            "propane",
+            name="compartment_fuel_type_enum",
+            native_enum=False,
+        ),
         nullable=False,
     )
     capacity_liters: Mapped[float] = mapped_column(DECIMAL(12, 2), nullable=False)
@@ -330,7 +348,13 @@ class DriverShift(Base):
     total_hours: Mapped[Optional[float]] = mapped_column(DECIMAL(4, 2))
     break_hours: Mapped[float] = mapped_column(DECIMAL(4, 2), default=0)
     status: Mapped[str] = mapped_column(
-        Enum("active", "completed", "interrupted", name="shift_status_enum"),
+        Enum(
+            "active",
+            "completed",
+            "interrupted",
+            name="shift_status_enum",
+            native_enum=False,
+        ),
         default="active",
     )
     notes: Mapped[Optional[str]] = mapped_column(Text)
