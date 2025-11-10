@@ -82,6 +82,22 @@ async def lifespan(_app: FastAPI):
             f"❌ Database connection failed: {type(e).__name__}: {str(e)}",
             exc_info=True,
         )
+        raise  # Fail fast if database is unreachable
+
+    # Create database tables if they don't exist
+    try:
+        _logger.info("Creating/verifying database tables...")
+        from models.database_models import Base
+        
+        async with db_manager.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        _logger.info("✅ Database tables created/verified successfully")
+    except Exception as e:
+        _logger.error(
+            f"❌ Failed to create database tables: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        raise  # Fail fast if tables can't be created
 
     _logger.info("=" * 80)
 
