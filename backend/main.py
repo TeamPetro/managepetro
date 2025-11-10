@@ -47,6 +47,7 @@ from models.database_models import (
     Delivery as DeliveryORM,
     Driver as DriverORM,
     DriverShift as DriverShiftORM,
+    Base,
 )
 import logging
 
@@ -87,8 +88,7 @@ async def lifespan(_app: FastAPI):
     # Create database tables if they don't exist
     try:
         _logger.info("Creating/verifying database tables...")
-        from models.database_models import Base
-        
+
         async with db_manager.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         _logger.info("✅ Database tables created/verified successfully")
