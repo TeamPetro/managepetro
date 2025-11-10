@@ -130,6 +130,30 @@ class Config:
         self.WEATHER_CITY = os.getenv("WEATHER_CITY", "Vancouver").strip()
         # Logging level for the application
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+        
+        # CORS Configuration
+        # Support comma-separated list of allowed origins from environment
+        # Falls back to default safe origins if not specified
+        cors_origins_env = os.getenv("CORS_ORIGINS", "").strip()
+        if cors_origins_env:
+            # Split by comma and strip whitespace from each origin
+            self.CORS_ORIGINS = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+        else:
+            # Default CORS origins for local development and known production frontend
+            self.CORS_ORIGINS = [
+                "http://localhost:3000",
+                "http://localhost:3001",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:3001",
+                "http://localhost:5173",  # Vite dev server
+                "https://managepetro.vercel.app", 
+                "https://manage-petro-frontend.vercel.app",  # Production frontend
+            ]
+        
+        # CORS Origin Regex Pattern (optional)
+        # Supports regex patterns for dynamic URLs (e.g., Vercel preview deployments)
+        # Example: r"https://.*\.vercel\.app" to allow all Vercel preview URLs
+        self.CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", "").strip() or None
 
         # If any required variables are missing, raise a clear error
         if missing_vars:

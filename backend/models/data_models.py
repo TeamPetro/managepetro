@@ -1,6 +1,14 @@
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, date
+from constants import (
+    REQUEST_METHOD_MANUAL,
+    DEFAULT_LOW_FUEL_THRESHOLD,
+    DEFAULT_FUEL_CONSUMPTION_RATE,
+    DEFAULT_TRUCK_FUEL_TANK_LITERS,
+    DEFAULT_TRUCK_FUEL_LEVEL_PERCENT,
+)
+from utils.serializers import truck_api_dict
 
 
 @dataclass
@@ -67,32 +75,33 @@ class StationData:
     fuel_type: str
     capacity_liters: int
     current_level_liters: int
-    request_method: Optional[str] = "Manual"
-    low_fuel_threshold: Optional[int] = 5000
+    request_method: Optional[str] = REQUEST_METHOD_MANUAL
+    low_fuel_threshold: Optional[int] = DEFAULT_LOW_FUEL_THRESHOLD
 
     @property
     def availability(self) -> str:
         """Calculate availability status"""
-        return "Available" if self.current_level_liters > 5000 else "Low Stock"
+        threshold = self.low_fuel_threshold or DEFAULT_LOW_FUEL_THRESHOLD
+        return "Available" if self.current_level_liters > threshold else "Low Stock"
 
     @property
     def coordinates(self) -> Dict[str, float]:
         """Get coordinates as dict"""
         return {"lat": self.lat, "lon": self.lon}
-    
+
     @property
     def needs_refuel(self) -> bool:
         """Check if station needs refuelling"""
-        threshold = self.low_fuel_threshold or 5000
+        threshold = self.low_fuel_threshold or DEFAULT_LOW_FUEL_THRESHOLD
         return self.current_level_liters < threshold
-    
+
     @property
     def fuel_level_percent(self) -> int:
         """Calculate fuel level as percentage"""
         if self.capacity_liters == 0:
             return 0
         return int((self.current_level_liters / self.capacity_liters) * 100)
-    
+
     @property
     def priority_level(self) -> str:
         """Determine priority level based on fuel percentage"""
@@ -105,25 +114,25 @@ class StationData:
             return "Medium"
         else:
             return "Low"
-    
+
     def distance_to(self, other_station: "StationData") -> float:
         """Calculate approximate distance to another station in km using Haversine formula"""
         from math import radians, sin, cos, sqrt, atan2
-        
+
         # Earth radius in kilometers
         R = 6371.0
-        
+
         lat1 = radians(self.lat)
         lon1 = radians(self.lon)
         lat2 = radians(other_station.lat)
         lon2 = radians(other_station.lon)
-        
+
         dlat = lat2 - lat1
         dlon = lon2 - lon1
-        
-        a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+
+        a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
         c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        
+
         return R * c
 
     def to_api_dict(self) -> Dict[str, Any]:
@@ -187,23 +196,42 @@ class TruckData:
     fuel_type: str
     status: str
     compartments: Optional[List[Dict[str, Any]]] = None
-    fuel_consumption_rate: Optional[float] = 35.0  # Liters per 100 km (default for heavy trucks)
-    truck_fuel_tank_liters: Optional[int] = 800  # Truck's own fuel tank (not cargo)
-    truck_fuel_level_percent: Optional[int] = 80  # Truck's own fuel level (not cargo)
-    
+    fuel_consumption_rate: Optional[float] = (
+        DEFAULT_FUEL_CONSUMPTION_RATE  # Liters per 100 km (default for heavy trucks)
+    )
+    truck_fuel_tank_liters: Optional[int] = (
+        DEFAULT_TRUCK_FUEL_TANK_LITERS  # Truck's own fuel tank (not cargo)
+    )
+    truck_fuel_level_percent: Optional[int] = (
+        DEFAULT_TRUCK_FUEL_LEVEL_PERCENT  # Truck's own fuel level (not cargo)
+    )
+    # Driver information
+    current_driver_id: Optional[int] = None
+    driver_name: Optional[str] = None
+    driver_status: Optional[str] = None
+    driver_hours_remaining: Optional[float] = None
+    driver_certifications: Optional[str] = None
+    has_active_deliveries: Optional[bool] = None
+    # Location and maintenance
+    current_location: Optional[str] = None
+    last_maintenance_date: Optional[date] = None
+    next_maintenance_date: Optional[date] = None
+
     @property
     def max_range_km(self) -> float:
         """Calculate truck's driving range based on its own fuel tank (not cargo)"""
         if not self.fuel_consumption_rate or not self.truck_fuel_tank_liters:
             return 0.0
-        current_fuel = (self.truck_fuel_tank_liters * self.truck_fuel_level_percent) / 100
+        current_fuel = (
+            self.truck_fuel_tank_liters * self.truck_fuel_level_percent
+        ) / 100
         return (current_fuel / self.fuel_consumption_rate) * 100
-    
+
     @property
     def cargo_fuel_liters(self) -> int:
         """Calculate current cargo fuel in liters"""
         return int((self.capacity_liters * self.fuel_level_percent) / 100)
-    
+
     @property
     def efficiency_rating(self) -> str:
         """Get efficiency rating based on fuel consumption"""
@@ -232,6 +260,22 @@ class TruckData:
             "max_range_km": round(self.max_range_km, 1) if self.max_range_km else None,
             "efficiency_rating": self.efficiency_rating,
             "cargo_fuel_liters": self.cargo_fuel_liters,
+            "current_driver_id": self.current_driver_id,
+            "driver_name": self.driver_name,
+            "driver_status": self.driver_status,
+            "driver_hours_remaining": self.driver_hours_remaining,
+            "driver_certifications": self.driver_certifications,
+            "current_location": self.current_location,
+            "last_maintenance_date": (
+                self.last_maintenance_date.isoformat()
+                if self.last_maintenance_date
+                else None
+            ),
+            "next_maintenance_date": (
+                self.next_maintenance_date.isoformat()
+                if self.next_maintenance_date
+                else None
+            ),
         }
 
 
@@ -275,7 +319,7 @@ class WeatherResult:
 class RouteOptimizationResponse:
     """
     Centralized data model for route optimization API responses.
-    
+
     This class acts as the single source of truth for the route optimization
     data structure. If the API response structure needs to change, only this
     class and the frontend data types need to be updated.
@@ -306,7 +350,7 @@ class RouteOptimizationResponse:
     def to_api_dict(self) -> Dict[str, Any]:
         """
         Convert to standardized API response format.
-        
+
         This is the ONLY method that defines the API response structure.
         All API endpoints should use this method to ensure consistency.
         """
@@ -334,7 +378,7 @@ class RouteOptimizationResponse:
     ) -> "RouteOptimizationResponse":
         """
         Create response from parsed AI and database data.
-        
+
         This factory method centralizes the logic for building the response,
         making it easy to modify the response structure in one place.
         """
@@ -367,7 +411,8 @@ class RouteOptimizationResponse:
         recent_deliveries = [
             delivery.to_api_dict() for delivery in db_data.deliveries[:5]
         ]
-        available_trucks = [truck.to_api_dict() for truck in db_data.trucks[:3]]
+
+        available_trucks = [truck_api_dict(truck) for truck in db_data.trucks[:3]]
 
         # Data sources
         data_sources = {
@@ -387,3 +432,152 @@ class RouteOptimizationResponse:
             data_sources=data_sources,
             ai_analysis=ai_response,
         )
+
+
+@dataclass
+class DriverData:
+    """Standardized driver data structure"""
+
+    driver_id: int
+    employee_id: str
+    first_name: str
+    last_name: str
+    phone: Optional[str]
+    email: Optional[str]
+    license_number: str
+    license_class: str
+    license_expiry_date: date
+    hazmat_certified: bool
+    hazmat_expiry_date: Optional[date]
+    tanker_endorsement: bool
+    years_experience: int
+    status: str
+    max_hours_per_shift: float
+    current_location: Optional[str]
+    home_terminal: Optional[str]
+    hourly_rate: Optional[float]
+    certifications: Optional[str]
+    hired_date: Optional[date]
+    last_medical_exam: Optional[date]
+    next_medical_exam: Optional[date]
+    # Computed fields
+    current_shift_hours: float = 0.0
+    weekly_hours: float = 0.0
+    assigned_truck_code: Optional[str] = None
+
+    @property
+    def full_name(self) -> str:
+        """Get driver's full name"""
+        return f"{self.first_name} {self.last_name}"
+
+    @property
+    def is_available(self) -> bool:
+        """Check if driver is available for dispatch"""
+        if self.status != "active":
+            return False
+        if self.current_shift_hours >= self.max_hours_per_shift:
+            return False
+        if self.hazmat_certified and self.hazmat_expiry_date:
+            if self.hazmat_expiry_date < date.today():
+                return False
+        if self.license_expiry_date < date.today():
+            return False
+        return True
+
+    @property
+    def hours_remaining_today(self) -> float:
+        """Calculate remaining hours driver can work today"""
+        return max(0, self.max_hours_per_shift - self.current_shift_hours)
+
+    @property
+    def certification_status(self) -> str:
+        """Get overall certification status"""
+        issues = []
+        if self.license_expiry_date < date.today():
+            issues.append("License Expired")
+        if self.hazmat_certified and self.hazmat_expiry_date:
+            if self.hazmat_expiry_date < date.today():
+                issues.append("HazMat Expired")
+        if self.next_medical_exam and self.next_medical_exam < date.today():
+            issues.append("Medical Exam Due")
+
+        if issues:
+            return "⚠️ " + ", ".join(issues)
+        return "✓ All Current"
+
+    def to_api_dict(self) -> Dict[str, Any]:
+        """Convert to API response format"""
+        return {
+            "driver_id": self.driver_id,
+            "employee_id": self.employee_id,
+            "full_name": self.full_name,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "phone": self.phone,
+            "email": self.email,
+            "license_number": self.license_number,
+            "license_class": self.license_class,
+            "license_expiry_date": (
+                self.license_expiry_date.isoformat()
+                if self.license_expiry_date
+                else None
+            ),
+            "hazmat_certified": self.hazmat_certified,
+            "hazmat_expiry_date": (
+                self.hazmat_expiry_date.isoformat() if self.hazmat_expiry_date else None
+            ),
+            "tanker_endorsement": self.tanker_endorsement,
+            "years_experience": self.years_experience,
+            "status": self.status,
+            "max_hours_per_shift": float(self.max_hours_per_shift),
+            "current_shift_hours": self.current_shift_hours,
+            "weekly_hours": self.weekly_hours,
+            "hours_remaining_today": self.hours_remaining_today,
+            "current_location": self.current_location,
+            "home_terminal": self.home_terminal,
+            "hourly_rate": float(self.hourly_rate) if self.hourly_rate else None,
+            "certifications": self.certifications,
+            "hired_date": self.hired_date.isoformat() if self.hired_date else None,
+            "last_medical_exam": (
+                self.last_medical_exam.isoformat() if self.last_medical_exam else None
+            ),
+            "next_medical_exam": (
+                self.next_medical_exam.isoformat() if self.next_medical_exam else None
+            ),
+            "certification_status": self.certification_status,
+            "is_available": self.is_available,
+            "assigned_truck_code": self.assigned_truck_code,
+        }
+
+
+@dataclass
+class DriverShiftData:
+    """Driver shift data for Hours of Service tracking"""
+
+    shift_id: int
+    driver_id: int
+    shift_start: datetime
+    shift_end: Optional[datetime]
+    total_hours: Optional[float]
+    break_hours: float
+    status: str
+    notes: Optional[str]
+
+    @property
+    def is_active(self) -> bool:
+        """Check if shift is currently active"""
+        return self.status == "active" and self.shift_end is None
+
+    def to_api_dict(self) -> Dict[str, Any]:
+        """Convert to API response format"""
+        return {
+            "shift_id": self.shift_id,
+            "driver_id": self.driver_id,
+            "shift_start": self.shift_start.isoformat() if self.shift_start else None,
+            "shift_end": self.shift_end.isoformat() if self.shift_end else None,
+            "total_hours": float(self.total_hours) if self.total_hours else None,
+            "break_hours": float(self.break_hours),
+            "status": self.status,
+            "notes": self.notes,
+            "is_active": self.is_active,
+        }

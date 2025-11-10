@@ -113,11 +113,19 @@ export function transformDispatchResponse(apiData) {
     ...otherFields
   } = apiData;
 
-  // Return the data in the structure expected by DispatchResultCard
+  // Flatten driver information to top level for easier access in UI
+  const driver_name = truck.driver_name || null;
+  const current_driver_id = truck.current_driver_id || null;
+  const truck_code = truck.code || truck.truck_id || null;
+
+  // Return the data in the structure expected by DispatchResultCard and Execute Dispatch
   return {
     dispatch_summary,
     route_stops,
     truck,
+    truck_code,
+    driver_name,
+    current_driver_id,
     stations_available,
     depot_location,
     ai_analysis,

@@ -3,7 +3,7 @@ SQLAlchemy 2.0 database configuration and session management.
 
 This module provides async database connectivity using SQLAlchemy 2.0
 with proper connection pooling and session management for FastAPI.
-"""
+""" 
 
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import (
@@ -19,23 +19,36 @@ from config import config
 class DatabaseManager:
     """Manages SQLAlchemy async database connections and sessions."""
 
+import os
+
+class DatabaseManager:
+    """Manages SQLAlchemy async database connections and sessions."""
+
     def __init__(self):
-        # Create async engine with aiomysql
-        database_url = (
-            f"mysql+aiomysql://{config.DB_USER}:{config.DB_PASS}"
-            f"@{config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}"
-        )
+        # Check if a DATABASE_URL env var is defined (Render)
+        database_url = os.getenv("DATABASE_URL")
+
+        if database_url:
+            # Use Render's managed Postgres database
+            # Render URLs look like: postgres://user:pass@host:5432/dbname
+            # SQLAlchemy async driver for Postgres uses "postgresql+asyncpg://"
+            if database_url.startswith("postgres://"):
+                database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        else:
+            # Fallback to local MySQL (your dev setup)
+            database_url = (
+                f"mysql+aiomysql://{config.DB_USER}:{config.DB_PASS}"
+                f"@{config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}"
+            )
 
         # SQLAlchemy 2.0 async engine configuration
         self.engine: AsyncEngine = create_async_engine(
             database_url,
-            # Connection pool settings - SQLAlchemy will automatically choose the right async pool
             pool_size=10,
             max_overflow=20,
             pool_pre_ping=True,
             pool_recycle=3600,
-            # SQLAlchemy 2.0 settings
-            echo=False,  # Set to True for SQL logging during development
+            echo=False,
         )
 
         # Session factory
@@ -45,6 +58,7 @@ class DatabaseManager:
             expire_on_commit=False,
             autoflush=True,
         )
+
 
     def get_session(self):
         """

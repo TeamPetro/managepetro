@@ -56,3 +56,18 @@ export function getDispatchRecommendations(params) {
 export function getDispatchFilters() {
   return httpClient.get("/dispatch/filters");
 }
+
+/**
+ * Execute a dispatch (create actual delivery records)
+ * @param {Object} executeData - Execute dispatch request data
+ * @param {string} executeData.truck_id - Truck identifier
+ * @param {string[]} executeData.station_ids - List of station IDs to deliver to
+ * @param {string} executeData.depot_location - Starting depot location
+ * @param {number} executeData.estimated_distance_km - Estimated distance
+ * @param {number} executeData.estimated_duration_minutes - Estimated duration
+ * @param {string} executeData.notes - Additional notes
+ * @returns {Promise<Object>} Dispatch execution result
+ */
+export function executeDispatch(executeData) {
+  return httpClient.post("/dispatch/execute", executeData);
+}

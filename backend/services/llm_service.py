@@ -3,6 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import joinedload
 from .prompt_service import PromptService
 from .api_utils import get_weather_async
 import re
@@ -18,10 +19,13 @@ from models.data_models import (
 )
 from typing import Dict, Any, Optional, List
 import logging
+from constants import TRUCK_STATUS_ACTIVE
 from utils.serializers import station_available_dict, truck_simple_dict
+from utils.orm_converters import convert_truck_orm_to_data, convert_stations_list
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from .lc_router import get_chat_model
+from constants import DEFAULT_LLM_MODEL, DEFAULT_VEHICLE_TYPE, TIME_MODE_DEPARTURE
 import os
 import asyncio
 import time
@@ -147,15 +151,19 @@ class LLMService:
         from_location: str,
         to_location: str,
         session: AsyncSession,
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "gemini-2.5-flash"),
+        llm_model: str = None,
         departure_time: Optional[str] = None,
         arrival_time: Optional[str] = None,
-        time_mode: str = "departure",
+        time_mode: str = TIME_MODE_DEPARTURE,
         delivery_date: Optional[str] = None,
-        vehicle_type: str = "fuel_delivery_truck",
+        vehicle_type: str = DEFAULT_VEHICLE_TYPE,
         notes: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate route optimization using standardized data models with SQLAlchemy 2.0"""
+
+        # Use default model if not provided
+        if llm_model is None:
+            llm_model = os.getenv("DEFAULT_LLM_MODEL", DEFAULT_LLM_MODEL)
 
         # Get standardized data using SQLAlchemy
         db_data = await self._get_database_data_sqlalchemy(
@@ -213,10 +221,14 @@ class LLMService:
         truck_id: str,
         depot_location: str,
         session: AsyncSession,
-        # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "gemini-2.5-flash"),
+        llm_model: str = None,
     ) -> Dict[str, Any]:
         """Optimize dispatch route for a truck to deliver fuel to stations in need using SQLAlchemy 2.0"""
+
+        # Use default model if not provided
+        if llm_model is None:
+            llm_model = os.getenv("DEFAULT_LLM_MODEL", DEFAULT_LLM_MODEL)
+
         try:
             self._logger.info(
                 "Starting dispatch optimization for truck_id: %s, depot: %s",
@@ -293,12 +305,17 @@ class LLMService:
         self,
         depot_location: str,
         session: AsyncSession,
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
+        llm_model: str = None,
         max_recommendations: int = 5,
         filter_region: Optional[str] = None,
         filter_city: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Get AI-powered batch dispatch recommendations for optimal truck-station matching"""
+
+        # Use default model if not provided
+        if llm_model is None:
+            llm_model = os.getenv("DEFAULT_LLM_MODEL", DEFAULT_LLM_MODEL)
+
         try:
             # Get all active trucks
             trucks = await self._get_active_trucks_sqlalchemy(session)
@@ -365,6 +382,17 @@ class LLMService:
                 depot_location=depot_location,
             )
 
+            # Add driver information to each recommendation
+            truck_lookup = {truck.code: truck for truck in trucks}
+            for rec in result.get("recommendations", []):
+                truck_code = rec.get("truck_code")
+                if truck_code and truck_code in truck_lookup:
+                    truck = truck_lookup[truck_code]
+                    rec["driver_name"] = truck.driver_name
+                    rec["driver_hours_remaining"] = truck.driver_hours_remaining
+                    rec["truck_plate"] = truck.plate
+                    rec["truck_status"] = truck.status
+
             # Add filter information to response
             result["filter_region"] = filter_region
             result["filter_city"] = filter_city
@@ -391,21 +419,7 @@ class LLMService:
                 )
                 result = await session.execute(stations_stmt)
                 stations_orm = result.scalars().all()
-                return [
-                    StationData(
-                        id=station.id,
-                        code=station.code,
-                        name=station.name,
-                        lat=station.lat,
-                        lon=station.lon,
-                        city=station.city,
-                        region=station.region,
-                        fuel_type=station.fuel_type,
-                        capacity_liters=station.capacity_liters,
-                        current_level_liters=station.current_level_liters,
-                    )
-                    for station in stations_orm
-                ]
+                return convert_stations_list(stations_orm)
 
             async def get_deliveries():
                 deliveries_stmt = (
@@ -463,7 +477,7 @@ class LLMService:
             async def get_trucks():
                 trucks_stmt = (
                     select(Truck)
-                    .where(Truck.status == "active")
+                    .where(Truck.status == TRUCK_STATUS_ACTIVE)
                     .order_by(Truck.capacity_liters.desc())
                     .limit(5)
                 )
@@ -577,39 +591,7 @@ class LLMService:
             stmt = select(Station).order_by(Station.name)
             result = await session.execute(stmt)
             stations_orm = result.scalars().all()
-
-            # Convert SQLAlchemy models to data models
-            stations = []
-            for station in stations_orm:
-                station_data = StationData(
-                    id=station.id,
-                    code=station.code,
-                    name=station.name,
-                    lat=float(station.lat) if station.lat else None,
-                    lon=float(station.lon) if station.lon else None,
-                    city=station.city,
-                    region=station.region,
-                    fuel_type=station.fuel_type,
-                    capacity_liters=(
-                        float(station.capacity_liters)
-                        if station.capacity_liters
-                        else None
-                    ),
-                    current_level_liters=(
-                        float(station.current_level_liters)
-                        if station.current_level_liters
-                        else None
-                    ),
-                    request_method=station.request_method,
-                    low_fuel_threshold=(
-                        float(station.low_fuel_threshold)
-                        if station.low_fuel_threshold
-                        else None
-                    ),
-                )
-                stations.append(station_data)
-
-            return stations
+            return convert_stations_list(stations_orm)
         except SQLAlchemyError as e:
             self._logger.exception("SQLAlchemy error getting stations")
             return []
@@ -618,40 +600,22 @@ class LLMService:
             return []
 
     async def get_all_trucks_sqlalchemy(self, session: AsyncSession) -> List[TruckData]:
-        """Get all trucks using SQLAlchemy 2.0 - new method"""
+        """Get all trucks using SQLAlchemy 2.0 with driver information"""
         try:
-            stmt = select(Truck).order_by(Truck.code)
+            stmt = (
+                select(Truck)
+                .options(joinedload(Truck.current_driver))
+                .options(joinedload(Truck.deliveries))
+                .order_by(Truck.code)
+            )
             result = await session.execute(stmt)
-            trucks_orm = result.scalars().all()
+            trucks_orm = result.unique().scalars().all()
 
             trucks = []
             for truck in trucks_orm:
                 # Get compartments using SQLAlchemy relationship
                 await session.refresh(truck, attribute_names=["compartments"])
-
-                compartments = []
-                for comp in truck.compartments:
-                    compartments.append(
-                        {
-                            "compartment_number": comp.compartment_number,
-                            "fuel_type": comp.fuel_type,
-                            "capacity_liters": float(comp.capacity_liters),
-                            "current_level_liters": float(comp.current_level_liters),
-                        }
-                    )
-
-                truck_data = TruckData(
-                    id=truck.id,
-                    code=truck.code,
-                    plate=truck.plate,
-                    capacity_liters=(
-                        float(truck.capacity_liters) if truck.capacity_liters else None
-                    ),
-                    fuel_level_percent=truck.fuel_level_percent,
-                    fuel_type=truck.fuel_type,
-                    status=truck.status,
-                    compartments=compartments,
-                )
+                truck_data = convert_truck_orm_to_data(truck)
                 trucks.append(truck_data)
 
             return trucks
@@ -665,45 +629,23 @@ class LLMService:
     async def _get_active_trucks_sqlalchemy(
         self, session: AsyncSession
     ) -> List[TruckData]:
-        """Get all active trucks using SQLAlchemy 2.0"""
+        """Get all active trucks using SQLAlchemy 2.0 with driver information"""
         try:
-            # Query active trucks
-            stmt = select(Truck).where(Truck.status == "active")
+            # Query active trucks with driver relationship loaded
+            stmt = (
+                select(Truck)
+                .options(joinedload(Truck.current_driver))
+                .options(joinedload(Truck.deliveries))
+                .where(Truck.status == TRUCK_STATUS_ACTIVE)
+            )
             result = await session.execute(stmt)
-            trucks_orm = result.scalars().all()
+            trucks_orm = result.unique().scalars().all()
 
             trucks = []
             for truck_orm in trucks_orm:
                 # Get compartments
                 await session.refresh(truck_orm, attribute_names=["compartments"])
-
-                compartments = []
-                for comp in truck_orm.compartments:
-                    compartments.append(
-                        {
-                            "compartment_number": comp.compartment_number,
-                            "fuel_type": comp.fuel_type,
-                            "capacity_liters": float(comp.capacity_liters),
-                            "current_level_liters": float(comp.current_level_liters),
-                        }
-                    )
-
-                trucks.append(
-                    TruckData(
-                        id=truck_orm.id,
-                        code=truck_orm.code,
-                        plate=truck_orm.plate,
-                        capacity_liters=(
-                            float(truck_orm.capacity_liters)
-                            if truck_orm.capacity_liters
-                            else None
-                        ),
-                        fuel_level_percent=truck_orm.fuel_level_percent,
-                        fuel_type=truck_orm.fuel_type,
-                        status=truck_orm.status,
-                        compartments=compartments,
-                    )
-                )
+                trucks.append(convert_truck_orm_to_data(truck_orm))
 
             return trucks
         except SQLAlchemyError as e:
@@ -716,13 +658,23 @@ class LLMService:
     async def _get_truck_by_id_sqlalchemy(
         self, session: AsyncSession, truck_id: str
     ) -> Optional[TruckData]:
-        """Get truck by ID using SQLAlchemy 2.0"""
+        """Get truck by ID using SQLAlchemy 2.0 with driver information"""
         try:
             self._logger.debug("Looking for truck with identifier: %s", truck_id)
 
-            # Parse display format like "T10 (CA-2211)" to extract "T10"
-            if " (" in truck_id and truck_id.endswith(")"):
-                truck_id = truck_id.split(" (")[0]
+            # Parse various display formats to extract truck code:
+            # "T10 (CA-2211)" -> "T10"
+            # "T01 (AB-1421) - John Martinez" -> "T01"
+            # "TRK-001 (AB-1234) - Driver Name" -> "TRK-001"
+
+            # First, remove anything after " - " (driver name)
+            if " - " in truck_id:
+                truck_id = truck_id.split(" - ")[0].strip()
+                self._logger.debug("Removed driver name suffix, now: %s", truck_id)
+
+            # Then, remove plate number in parentheses
+            if " (" in truck_id:
+                truck_id = truck_id.split(" (")[0].strip()
                 self._logger.debug(
                     "Parsed display format to truck identifier: %s", truck_id
                 )
@@ -735,19 +687,34 @@ class LLMService:
                     self._logger.debug(
                         "Converted truck-%03d to ID: %s", numeric_id, numeric_id
                     )
-                    stmt = select(Truck).where(Truck.id == numeric_id)
+                    stmt = (
+                        select(Truck)
+                        .options(joinedload(Truck.current_driver))
+                        .options(joinedload(Truck.deliveries))
+                        .where(Truck.id == numeric_id)
+                    )
                 except (ValueError, IndexError):
                     self._logger.debug("Invalid truck ID format: %s", truck_id)
                     return None
             else:
                 # Look up by code (T01, T02, etc.) or numeric ID
                 if truck_id.isdigit():
-                    stmt = select(Truck).where(Truck.id == int(truck_id))
+                    stmt = (
+                        select(Truck)
+                        .options(joinedload(Truck.current_driver))
+                        .options(joinedload(Truck.deliveries))
+                        .where(Truck.id == int(truck_id))
+                    )
                 else:
-                    stmt = select(Truck).where(Truck.code == truck_id)
+                    stmt = (
+                        select(Truck)
+                        .options(joinedload(Truck.current_driver))
+                        .options(joinedload(Truck.deliveries))
+                        .where(Truck.code == truck_id)
+                    )
 
             result = await session.execute(stmt)
-            truck_orm = result.scalar_one_or_none()
+            truck_orm = result.unique().scalar_one_or_none()
 
             if not truck_orm:
                 # Debug: show available trucks
@@ -766,31 +733,7 @@ class LLMService:
             # Get compartments using SQLAlchemy relationship
             await session.refresh(truck_orm, attribute_names=["compartments"])
 
-            compartments = []
-            for comp in truck_orm.compartments:
-                compartments.append(
-                    {
-                        "compartment_number": comp.compartment_number,
-                        "fuel_type": comp.fuel_type,
-                        "capacity_liters": float(comp.capacity_liters),
-                        "current_level_liters": float(comp.current_level_liters),
-                    }
-                )
-
-            return TruckData(
-                id=truck_orm.id,
-                code=truck_orm.code,
-                plate=truck_orm.plate,
-                capacity_liters=(
-                    float(truck_orm.capacity_liters)
-                    if truck_orm.capacity_liters
-                    else None
-                ),
-                fuel_level_percent=truck_orm.fuel_level_percent,
-                fuel_type=truck_orm.fuel_type,
-                status=truck_orm.status,
-                compartments=compartments,
-            )
+            return convert_truck_orm_to_data(truck_orm)
         except SQLAlchemyError as e:
             self._logger.exception("SQLAlchemy error getting truck by ID")
             return None
@@ -833,26 +776,7 @@ class LLMService:
 
             result = await session.execute(stmt)
             stations_orm = result.scalars().all()
-
-            stations = []
-            for station in stations_orm:
-                station_data = StationData(
-                    id=station.id,
-                    code=station.code,
-                    name=station.name,
-                    lat=station.lat,
-                    lon=station.lon,
-                    city=station.city,
-                    region=station.region,
-                    fuel_type=station.fuel_type,
-                    capacity_liters=station.capacity_liters,
-                    current_level_liters=station.current_level_liters,
-                    request_method=station.request_method,
-                    low_fuel_threshold=station.low_fuel_threshold,
-                )
-                stations.append(station_data)
-
-            return stations
+            return convert_stations_list(stations_orm)
         except SQLAlchemyError as e:
             self._logger.exception("SQLAlchemy error getting stations needing refuel")
             return []
@@ -928,7 +852,7 @@ class LLMService:
         weather_data: WeatherResult,
         departure_time: Optional[str] = None,
         arrival_time: Optional[str] = None,
-        time_mode: str = "departure",
+        time_mode: str = TIME_MODE_DEPARTURE,
     ) -> Dict[str, Any]:
         """Parse AI response using standardized data models"""
 
@@ -959,7 +883,7 @@ class LLMService:
             traffic_info = {"note": "Traffic analysis in AI response"}
 
         # Add time-based information to traffic_info
-        if time_mode == "departure" and departure_time:
+        if time_mode == TIME_MODE_DEPARTURE and departure_time:
             traffic_info["requested_departure"] = departure_time
         elif time_mode == "arrival" and arrival_time:
             traffic_info["requested_arrival"] = arrival_time
@@ -1309,9 +1233,44 @@ class LLMService:
                 # Sort stops by step_number to ensure correct order
                 route_stops.sort(key=lambda x: x.get("step_number", float("inf")))
 
-                # Remove step_number from the output as it's only used for sorting
+                # Extract station codes and clean up route stops
+                # Also match station names to actual station codes from the stations list
+                station_lookup = {}
+                for station in stations:
+                    # Create lookup by name and code
+                    station_lookup[station.name.lower()] = station.code
+                    station_lookup[station.code.lower()] = station.code
+                    # Also match "name (code)" format
+                    full_name = f"{station.name} ({station.code})".lower()
+                    station_lookup[full_name] = station.code
+
                 for stop in route_stops:
                     stop.pop("step_number", None)
+
+                    # Extract station code from station name (format: "Station Name (CODE)")
+                    station_text = stop.get("station", "")
+                    station_code = None
+
+                    if "(" in station_text and ")" in station_text:
+                        # Extract code from parentheses
+                        start_idx = station_text.rfind("(")
+                        end_idx = station_text.rfind(")")
+                        if start_idx < end_idx:
+                            station_code = station_text[start_idx + 1 : end_idx].strip()
+                            # Also extract clean station name without code
+                            stop["station_name"] = station_text[:start_idx].strip()
+
+                    # If no code found in parentheses, try to match from station list
+                    if not station_code:
+                        station_code = station_lookup.get(station_text.lower())
+
+                    if station_code:
+                        stop["station_code"] = station_code
+                    else:
+                        # Log warning if we couldn't find a station code
+                        self._logger.warning(
+                            "Could not extract station code from: %s", station_text
+                        )
         except Exception:
             self._logger.exception("Error parsing route stops")
 
