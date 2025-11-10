@@ -75,25 +75,32 @@ class AuthService:
         self, session: AsyncSession, username: str, email: str, password: str
     ) -> User:
         """Create a new user in the database using SQLAlchemy 2.0"""
+        self._logger.info(f"create_user called for username: {username}")
         try:
             # Check if username or email already exists
+            self._logger.debug(f"Checking if username exists: {username}")
             existing_user = await self.get_user_by_username(session, username)
             if existing_user:
+                self._logger.warning(f"Username already exists: {username}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Username already exists",
                 )
 
+            self._logger.debug(f"Checking if email exists: {email}")
             existing_email = await self.get_user_by_email(session, email)
             if existing_email:
+                self._logger.warning(f"Email already registered: {email}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Email already registered",
                 )
 
+            self._logger.debug("Hashing password...")
             hashed_password = self.get_password_hash(password)
 
             # Create new user using SQLAlchemy model
+            self._logger.debug("Creating User model instance...")
             new_user = User(
                 username=username,
                 email=email,
@@ -102,22 +109,39 @@ class AuthService:
                 created_at=datetime.now(timezone.utc),
                 updated_at=datetime.now(timezone.utc),
             )
+            self._logger.debug(f"User model created: {new_user.username}")
 
+            self._logger.debug("Adding user to session...")
             session.add(new_user)
+
+            self._logger.debug("Committing transaction...")
             await session.commit()
+
+            self._logger.debug("Refreshing user object...")
             await session.refresh(new_user)
 
+            self._logger.info(
+                f"User created successfully: {new_user.username} (ID: {new_user.id})"
+            )
             return new_user
 
         except HTTPException:
+            self._logger.debug("HTTPException raised, re-raising...")
             raise
-        except IntegrityError:
+        except IntegrityError as ie:
+            self._logger.error(
+                f"IntegrityError during user creation: {str(ie)}", exc_info=True
+            )
             await session.rollback()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Username or email already exists",
             )
         except Exception as e:
+            self._logger.error(
+                f"Unexpected error during user creation: {type(e).__name__}: {str(e)}",
+                exc_info=True,
+            )
             await session.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

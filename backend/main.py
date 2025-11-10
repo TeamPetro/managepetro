@@ -1,3 +1,5 @@
+import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
@@ -50,13 +52,51 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Lifespan event handler for startup and shutdown"""
+    # Startup
+    _logger.info("=" * 80)
+    _logger.info("MANAGE PETRO API - STARTING UP")
+    _logger.info("=" * 80)
+    _logger.info(
+        f"Environment: {'Production' if os.getenv('DATABASE_URL') else 'Development'}"
+    )
+    _logger.info(
+        f"Database: {'PostgreSQL (Render)' if os.getenv('DATABASE_URL') else 'MySQL (Local)'}"
+    )
+    _logger.info(f"CORS Origins: {len(config.CORS_ORIGINS)} configured")
+
+    # Test database connectivity
+    try:
+        from database import db_manager
+
+        async with db_manager.get_session() as session:
+            from sqlalchemy import text
+
+            result = await session.execute(text("SELECT 1"))
+            _logger.info("✅ Database connection successful")
+    except Exception as e:
+        _logger.error(
+            f"❌ Database connection failed: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+
+    _logger.info("=" * 80)
+
+    yield  # Application runs here
+
+    # Shutdown (if needed in the future)
+    _logger.info("MANAGE PETRO API - SHUTTING DOWN")
+
+
 app = FastAPI(
     title="Manage Petro API",
     description="API for managing fuel delivery operations with AI-powered route optimization",
     version="1.0.0",
+    lifespan=lifespan,
 )
-
-
 
 
 @app.get("/", include_in_schema=False)
@@ -616,24 +656,39 @@ async def register_user(
     user_data: UserCreate, session: AsyncSession = Depends(get_db_session)
 ):
     """Register a new user using SQLAlchemy 2.0"""
+    _logger.info(
+        f"Registration attempt for username: {user_data.username}, email: {user_data.email}"
+    )
     try:
+        _logger.debug("Calling auth_service.create_user...")
         user = await auth_service.create_user(
             session=session,
             username=user_data.username,
             email=user_data.email,
             password=user_data.password,
         )
+        _logger.info(f"User created successfully: {user.username} (ID: {user.id})")
+
         # Convert SQLAlchemy model to Pydantic response model
-        return User(
+        response = User(
             id=user.id,
             username=user.username,
             email=user.email,
             is_active=user.is_active,
             created_at=user.created_at,
         )
-    except HTTPException:
+        _logger.debug(f"Returning user response: {response.username}")
+        return response
+    except HTTPException as he:
+        _logger.warning(
+            f"Registration failed with HTTPException: {he.status_code} - {he.detail}"
+        )
         raise
     except Exception as e:
+        _logger.error(
+            f"Registration failed with unexpected error: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
         raise_500("Registration failed", e)
 
 
