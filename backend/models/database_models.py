@@ -4,7 +4,8 @@ SQLAlchemy 2.0 database models for ManagePetro application.
 These models correspond to the database schema and provide type-safe
 database operations using SQLAlchemy's modern declarative approach.
 """
-
+from sqlalchemy.schema import CreateIndex
+from sqlalchemy.ext.compiler import compiles
 from datetime import datetime, date
 from typing import List, Optional
 from sqlalchemy import (
@@ -30,6 +31,15 @@ from constants import (
     TRUCK_STATUS_ACTIVE,
     DELIVERY_STATUS_PLANNED,
 )
+
+
+@compiles(CreateIndex, "postgresql")
+def compile_create_index(element, compiler, **kw):
+    """Ensure CREATE INDEX statements use IF NOT EXISTS for PostgreSQL."""
+    statement = compiler.visit_create_index(element)
+    if "IF NOT EXISTS" not in statement:
+        statement = statement.replace("CREATE INDEX", "CREATE INDEX IF NOT EXISTS")
+    return statement
 
 
 class Base(DeclarativeBase):

@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, text
 from services.llm_service import LLMService
+from sqlalchemy.exc import ProgrammingError, OperationalError
+
 from utils.serializers import (
     station_api_dict,
     truck_api_dict,
@@ -93,7 +95,25 @@ async def lifespan(_app: FastAPI):
             f"❌ Failed to create database tables: {type(e).__name__}: {str(e)}",
             exc_info=True,
         )
-        raise  # Fail fast if tables can't be created
+        raise
+
+
+    try:
+        _logger.info("Creating/verifying database tables...")
+
+        async with db_manager.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all, checkfirst=True)
+
+        _logger.info("✅ Database tables created or verified successfully")
+
+    except (ProgrammingError, OperationalError) as e:
+        msg = str(e)
+        if "already exists" in msg or "DuplicateTableError" in msg:
+            _logger.warning("⚠️ Skipping existing indexes or tables.")
+        else:
+            _logger.error(f"❌ Failed to create database tables: {msg}", exc_info=True)
+            raise # Fail fast if tables can't be created
+
 
     _logger.info("=" * 80)
 
