@@ -86,7 +86,7 @@ async def lifespan(_app: FastAPI):
         _logger.info("Creating/verifying database tables...")
 
         async with db_manager.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(Base.metadata.create_all, checkfirst=True)
         _logger.info("✅ Database tables created/verified successfully")
     except Exception as e:
         _logger.error(
