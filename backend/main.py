@@ -39,7 +39,7 @@ from models.request_models import (
     ExecuteDispatchRequest,
 )
 from models.data_models import DriverData, DriverShiftData
-from database import get_db_session
+from database import get_db_session, db_manager
 from config import config
 from models.database_models import (
     Truck as TruckORM,
@@ -47,6 +47,7 @@ from models.database_models import (
     Delivery as DeliveryORM,
     Driver as DriverORM,
     DriverShift as DriverShiftORM,
+    Base,
 )
 import logging
 
@@ -70,11 +71,7 @@ async def lifespan(_app: FastAPI):
 
     # Test database connectivity
     try:
-        from database import db_manager
-
         async with db_manager.get_session() as session:
-            from sqlalchemy import text
-
             result = await session.execute(text("SELECT 1"))
             _logger.info("✅ Database connection successful")
     except Exception as e:
@@ -82,6 +79,21 @@ async def lifespan(_app: FastAPI):
             f"❌ Database connection failed: {type(e).__name__}: {str(e)}",
             exc_info=True,
         )
+        raise  # Fail fast if database is unreachable
+
+    # Create database tables if they don't exist
+    try:
+        _logger.info("Creating/verifying database tables...")
+
+        async with db_manager.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        _logger.info("✅ Database tables created/verified successfully")
+    except Exception as e:
+        _logger.error(
+            f"❌ Failed to create database tables: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        raise  # Fail fast if tables can't be created
 
     _logger.info("=" * 80)
 
