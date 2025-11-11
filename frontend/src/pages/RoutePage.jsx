@@ -2,6 +2,7 @@ import RouteForm from "../components/RouteForm";
 import ActionButtons from "../components/ActionButtons";
 import ETADisplay from "../components/ETADisplay";
 import InstructionsList from "../components/InstructionsList";
+import RouteMap from "../components/RouteMap";
 import WeatherImpactCard from "../components/WeatherImpactCard";
 import TrafficConditionsCard from "../components/TrafficConditionsCard";
 import FuelStationsCard from "../components/FuelStationsCard";
@@ -63,9 +64,15 @@ function RoutePage({ selectedLLM }) {
               </div>
 
               <div className="lg:col-span-2">
-                <InstructionsList instructions={routeData.instructions} />
+                <InstructionsList 
+                  instructions={routeData.instructions} 
+                  maneuvers={routeData.maneuvers}
+                />
               </div>
             </div>
+
+            {/* Route Map - Full width */}
+            <RouteMap routeData={routeData} />
 
             {/* Additional route details - 2 column layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
