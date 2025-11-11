@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import (
 from models.database_models import Base
 from config import config
 import os
+import logging
 
 
 class DatabaseManager:
@@ -26,8 +27,6 @@ class DatabaseManager:
     """Manages SQLAlchemy async database connections and sessions."""
 
     def __init__(self):
-        import logging
-
         logger = logging.getLogger(__name__)
 
         # Check if a DATABASE_URL env var is defined (Render)
@@ -124,8 +123,6 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
             result = await session.execute(stmt)
             return result.scalars().all()
     """
-    import logging
-
     logger = logging.getLogger(__name__)
     logger.debug("get_db_session: Creating new database session")
 

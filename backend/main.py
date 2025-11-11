@@ -39,7 +39,7 @@ from models.request_models import (
     ExecuteDispatchRequest,
 )
 from models.data_models import DriverData, DriverShiftData
-from database import get_db_session
+from database import get_db_session, db_manager
 from config import config
 from models.database_models import (
     Truck as TruckORM,
@@ -71,11 +71,7 @@ async def lifespan(_app: FastAPI):
 
     # Test database connectivity
     try:
-        from database import db_manager
-
         async with db_manager.get_session() as session:
-            from sqlalchemy import text
-
             result = await session.execute(text("SELECT 1"))
             _logger.info("✅ Database connection successful")
     except Exception as e:

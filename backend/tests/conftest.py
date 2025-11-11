@@ -2,12 +2,12 @@ import pytest
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from database import Base
-from main import app, get_session  # ✅ make sure get_session is imported
+from database import Base, get_db_session as get_session
+from main import app
 from httpx import AsyncClient, ASGITransport
 
-# ✅ Use in-memory SQLite for fast isolated testing
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
 
 @pytest.fixture(scope="function")
 async def test_engine():
@@ -19,6 +19,7 @@ async def test_engine():
     yield engine
     await engine.dispose()
 
+
 @pytest.fixture(scope="function")
 async def test_session(test_engine):
     async_session = sessionmaker(
@@ -27,9 +28,11 @@ async def test_session(test_engine):
     async with async_session() as session:
         yield session
 
+
 @pytest.fixture(scope="function")
 async def async_client(test_session):
     """Create a test client using the test DB session."""
+
     # ✅ Override the dependency so FastAPI routes use test_session
     async def override_get_session():
         yield test_session
@@ -42,6 +45,7 @@ async def async_client(test_session):
 
     # ✅ Clean up override after each test
     app.dependency_overrides.clear()
+
 
 @pytest.fixture(scope="session", autouse=True)
 def close_event_loop():
