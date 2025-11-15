@@ -18,7 +18,6 @@ from sqlalchemy import (
     Enum,
     DECIMAL,
     Text,
-    TIMESTAMP,
     ForeignKey,
     Index,
     UniqueConstraint,
@@ -345,7 +344,7 @@ class WeatherData(Base):
     condition: Mapped[Optional[str]] = mapped_column(Text)
     wind: Mapped[Optional[float]] = mapped_column(DECIMAL(5, 2))
     humidity: Mapped[Optional[float]] = mapped_column(DECIMAL(5, 2))
-    collected_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
+    collected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class DriverShift(Base):
