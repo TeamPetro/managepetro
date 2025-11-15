@@ -108,9 +108,14 @@ AVERAGE_FUEL_CONSUMPTION = 40.0
 POOR_FUEL_CONSUMPTION = 45.0
 
 # CORS allowed origins
+# NOTE: This is now configured via environment variables in config.py
+# Import from config.py instead of using this constant directly
+# Kept here for backwards compatibility only
 CORS_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
+    "http://localhost:5173",  # Vite dev server
+    "https://manage-petro-frontend.vercel.app",  # Production frontend
 ]

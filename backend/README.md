@@ -95,6 +95,105 @@ TOMTOM_API_KEY=get_from_developer.tomtom.com
 GEMINI_API_KEY=get_from_makersuite.google.com
 ```
 
+## Production Deployment - CORS Configuration
+
+When deploying the backend and frontend to separate hosting providers (e.g., backend on Railway/Render and frontend on Vercel), you need to configure CORS (Cross-Origin Resource Sharing) to allow your frontend to communicate with the backend.
+
+### Why is this needed?
+
+By default, the backend only allows requests from `localhost` and the production frontend URL hardcoded in the config. If you deploy to:
+- Multiple environments (staging, preview, production)
+- Dynamic URLs (Vercel preview deployments)
+- Different hosting providers
+
+...you'll get CORS errors in the browser console like: `Access to fetch at '...' from origin '...' has been blocked by CORS policy`
+
+### Solution 1: Specific Frontend URLs (Recommended)
+
+Set the `CORS_ORIGINS` environment variable in your backend deployment:
+
+```bash
+# Single production frontend
+CORS_ORIGINS=https://your-frontend.com
+
+# Multiple environments
+CORS_ORIGINS=https://prod.example.com,https://staging.example.com,http://localhost:3000
+```
+
+### Solution 2: Dynamic URLs (Vercel Previews)
+
+For services like Vercel that generate dynamic preview URLs (e.g., `https://managepetro-abc123.vercel.app`), use a regex pattern:
+
+```bash
+# Allow your main production URL + all preview deployments
+CORS_ORIGINS=https://manage-petro-frontend.vercel.app
+CORS_ORIGIN_REGEX=https://managepetro-.*\.vercel\.app
+```
+
+**Security Note:** Be specific with your regex pattern! Don't use `https://.*\.vercel\.app` (too broad) - use your app name prefix to restrict it to only your deployments.
+
+### How to Configure
+
+1. **Find your backend hosting provider's environment variables section**
+   - Railway: Settings → Environment Variables
+   - Render: Environment → Environment Variables
+   - Heroku: Settings → Config Vars
+
+2. **Add the CORS configuration:**
+   ```
+   Variable: CORS_ORIGINS
+   Value: https://your-frontend-url.com
+   ```
+
+3. **If using Vercel preview deployments, also add:**
+   ```
+   Variable: CORS_ORIGIN_REGEX
+   Value: https://your-app-name-.*\.vercel\.app
+   ```
+
+4. **Redeploy your backend** (most platforms auto-redeploy on env var changes)
+
+### Verifying CORS Configuration
+
+1. Check your backend logs on startup - you should see:
+   ```
+   INFO: Configuring CORS with X allowed origins
+   INFO: CORS origin regex pattern: https://...
+   ```
+
+2. Test in your browser's DevTools console on your frontend:
+   ```javascript
+   fetch('https://your-backend.com/api/health')
+     .then(r => r.json())
+     .then(console.log)
+   ```
+
+3. If you see CORS errors, check:
+   - ✅ Frontend URL exactly matches what's in `CORS_ORIGINS`
+   - ✅ Include protocol (`https://`) in the URL
+   - ✅ No trailing slash in the URL
+   - ✅ Backend was redeployed after env var change
+
+### Common Deployment Scenarios
+
+**Vercel Frontend + Railway Backend:**
+```bash
+# On Railway backend:
+CORS_ORIGINS=https://your-app.vercel.app
+CORS_ORIGIN_REGEX=https://your-app-.*\.vercel\.app
+```
+
+**Netlify Frontend + Render Backend:**
+```bash
+# On Render backend:
+CORS_ORIGINS=https://your-app.netlify.app,https://staging--your-app.netlify.app
+```
+
+**Custom Domain:**
+```bash
+CORS_ORIGINS=https://app.yourdomain.com
+```
+
 ## Common Problems & Solutions
 
 ### "Database won't connect" or "Connection refused"

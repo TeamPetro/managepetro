@@ -1,6 +1,6 @@
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from constants import (
     REQUEST_METHOD_MANUAL,
     DEFAULT_LOW_FUEL_THRESHOLD,
@@ -57,7 +57,7 @@ class WeatherData:
             "condition": self.condition,
             "wind": self.wind_kph,  # DB field name
             "humidity": self.humidity,
-            "collected_at": datetime.now(),
+            "collected_at": datetime.now(timezone.utc),
         }
 
 

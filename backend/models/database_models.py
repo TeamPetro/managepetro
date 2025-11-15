@@ -5,6 +5,8 @@ These models correspond to the database schema and provide type-safe
 database operations using SQLAlchemy's modern declarative approach.
 """
 
+from sqlalchemy.schema import CreateIndex
+from sqlalchemy.ext.compiler import compiles
 from datetime import datetime, date
 from typing import List, Optional
 from sqlalchemy import (
@@ -16,13 +18,11 @@ from sqlalchemy import (
     Enum,
     DECIMAL,
     Text,
-    TIMESTAMP,
     ForeignKey,
     Index,
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
 from constants import (
     DEFAULT_FUEL_TYPE,
     DEFAULT_LOW_FUEL_THRESHOLD,
@@ -30,6 +30,15 @@ from constants import (
     TRUCK_STATUS_ACTIVE,
     DELIVERY_STATUS_PLANNED,
 )
+
+
+@compiles(CreateIndex, "postgresql")
+def compile_create_index(element, compiler, **kw):
+    """Ensure CREATE INDEX statements use IF NOT EXISTS for PostgreSQL."""
+    statement = compiler.visit_create_index(element)
+    if "IF NOT EXISTS" not in statement:
+        statement = statement.replace("CREATE INDEX", "CREATE INDEX IF NOT EXISTS")
+    return statement
 
 
 class Base(DeclarativeBase):
@@ -48,14 +57,13 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Timestamps are set by application code with timezone-aware datetimes
+    # Using DateTime(timezone=True) for PostgreSQL TIMESTAMP WITH TIME ZONE compatibility
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.current_timestamp(), nullable=False
+        DateTime(timezone=True), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=func.current_timestamp(),
-        onupdate=func.current_timestamp(),
-        nullable=False,
+        DateTime(timezone=True), nullable=False
     )
 
     # Indexes for performance
@@ -84,7 +92,13 @@ class Driver(Base):
     tanker_endorsement: Mapped[bool] = mapped_column(Boolean, default=False)
     years_experience: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(
-        Enum("active", "on_leave", "inactive", name="driver_status_enum"),
+        Enum(
+            "active",
+            "on_leave",
+            "inactive",
+            name="driver_status_enum",
+            native_enum=False,
+        ),
         default="active",
     )
     max_hours_per_shift: Mapped[Optional[float]] = mapped_column(
@@ -98,15 +112,9 @@ class Driver(Base):
     hired_date: Mapped[Optional[date]] = mapped_column(Date)
     last_medical_exam: Mapped[Optional[date]] = mapped_column(Date)
     next_medical_exam: Mapped[Optional[date]] = mapped_column(Date)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.current_timestamp(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=func.current_timestamp(),
-        onupdate=func.current_timestamp(),
-        nullable=False,
-    )
+    # Timestamps set by application code with timezone-aware datetimes
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     @property
     def full_name(self) -> str:
@@ -145,13 +153,14 @@ class Station(Base):
     city: Mapped[Optional[str]] = mapped_column(String(100))
     region: Mapped[Optional[str]] = mapped_column(String(100))
     fuel_type: Mapped[str] = mapped_column(
-        Enum("diesel", "gasoline", "propane", name="fuel_type_enum"),
+        Enum("diesel", "gasoline", "propane", name="fuel_type_enum", native_enum=False),
         default=DEFAULT_FUEL_TYPE,
     )
     capacity_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
     current_level_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
     request_method: Mapped[str] = mapped_column(
-        Enum("IoT", "Manual", name="request_method_enum"), default=REQUEST_METHOD_MANUAL
+        Enum("IoT", "Manual", name="request_method_enum", native_enum=False),
+        default=REQUEST_METHOD_MANUAL,
     )
     low_fuel_threshold: Mapped[Optional[float]] = mapped_column(
         DECIMAL(12, 2), default=DEFAULT_LOW_FUEL_THRESHOLD
@@ -177,11 +186,23 @@ class Truck(Base):
     capacity_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
     fuel_level_percent: Mapped[Optional[int]] = mapped_column(Integer)
     fuel_type: Mapped[str] = mapped_column(
-        Enum("diesel", "gasoline", "propane", name="truck_fuel_type_enum"),
+        Enum(
+            "diesel",
+            "gasoline",
+            "propane",
+            name="truck_fuel_type_enum",
+            native_enum=False,
+        ),
         default=DEFAULT_FUEL_TYPE,
     )
     status: Mapped[str] = mapped_column(
-        Enum("active", "maintenance", "offline", name="truck_status_enum"),
+        Enum(
+            "active",
+            "maintenance",
+            "offline",
+            name="truck_status_enum",
+            native_enum=False,
+        ),
         default=TRUCK_STATUS_ACTIVE,
     )
     current_driver_id: Mapped[Optional[int]] = mapped_column(
@@ -222,15 +243,20 @@ class Delivery(Base):
         Integer, ForeignKey("drivers.id", ondelete="SET NULL")
     )
     volume_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
-    delivery_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    completed_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    delivery_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    completed_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     estimated_duration_minutes: Mapped[Optional[int]] = mapped_column(Integer)
     actual_duration_minutes: Mapped[Optional[int]] = mapped_column(Integer)
     distance_km: Mapped[Optional[float]] = mapped_column(DECIMAL(8, 2))
     notes: Mapped[Optional[str]] = mapped_column(Text)
     status: Mapped[str] = mapped_column(
         Enum(
-            "planned", "enroute", "delivered", "canceled", name="delivery_status_enum"
+            "planned",
+            "enroute",
+            "delivered",
+            "canceled",
+            name="delivery_status_enum",
+            native_enum=False,
         ),
         default=DELIVERY_STATUS_PLANNED,
     )
@@ -263,9 +289,8 @@ class StationFuelLevel(Base):
     station_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("stations.id", ondelete="CASCADE")
     )
-    recorded_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.current_timestamp()
-    )
+    # recorded_at should be set by application code with timezone-aware datetimes
+    recorded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     fuel_level_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
 
     # Relationships
@@ -285,7 +310,13 @@ class TruckCompartment(Base):
     )
     compartment_number: Mapped[int] = mapped_column(Integer, nullable=False)
     fuel_type: Mapped[str] = mapped_column(
-        Enum("diesel", "gasoline", "propane", name="compartment_fuel_type_enum"),
+        Enum(
+            "diesel",
+            "gasoline",
+            "propane",
+            name="compartment_fuel_type_enum",
+            native_enum=False,
+        ),
         nullable=False,
     )
     capacity_liters: Mapped[float] = mapped_column(DECIMAL(12, 2), nullable=False)
@@ -313,7 +344,7 @@ class WeatherData(Base):
     condition: Mapped[Optional[str]] = mapped_column(Text)
     wind: Mapped[Optional[float]] = mapped_column(DECIMAL(5, 2))
     humidity: Mapped[Optional[float]] = mapped_column(DECIMAL(5, 2))
-    collected_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
+    collected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class DriverShift(Base):
@@ -325,12 +356,20 @@ class DriverShift(Base):
     driver_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False
     )
-    shift_start: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    shift_end: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    shift_start: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    shift_end: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     total_hours: Mapped[Optional[float]] = mapped_column(DECIMAL(4, 2))
     break_hours: Mapped[float] = mapped_column(DECIMAL(4, 2), default=0)
     status: Mapped[str] = mapped_column(
-        Enum("active", "completed", "interrupted", name="shift_status_enum"),
+        Enum(
+            "active",
+            "completed",
+            "interrupted",
+            name="shift_status_enum",
+            native_enum=False,
+        ),
         default="active",
     )
     notes: Mapped[Optional[str]] = mapped_column(Text)

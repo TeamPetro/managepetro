@@ -1,3 +1,5 @@
+import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
@@ -5,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, text
 from services.llm_service import LLMService
+from sqlalchemy.exc import ProgrammingError, OperationalError
+
 from utils.serializers import (
     station_api_dict,
     truck_api_dict,
@@ -37,24 +41,91 @@ from models.request_models import (
     ExecuteDispatchRequest,
 )
 from models.data_models import DriverData, DriverShiftData
-from database import get_db_session
+from database import get_db_session, db_manager
 from config import config
-from constants import CORS_ORIGINS
 from models.database_models import (
     Truck as TruckORM,
     Station as StationORM,
     Delivery as DeliveryORM,
     Driver as DriverORM,
     DriverShift as DriverShiftORM,
+    Base,
 )
 import logging
 
 _logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Lifespan event handler for startup and shutdown"""
+    # Startup
+    _logger.info("=" * 80)
+    _logger.info("MANAGE PETRO API - STARTING UP")
+    _logger.info("=" * 80)
+    _logger.info(
+        f"Environment: {'Production' if os.getenv('DATABASE_URL') else 'Development'}"
+    )
+    _logger.info(
+        f"Database: {'PostgreSQL (Render)' if os.getenv('DATABASE_URL') else 'MySQL (Local)'}"
+    )
+    _logger.info(f"CORS Origins: {len(config.CORS_ORIGINS)} configured")
+
+    # Test database connectivity
+    try:
+        async with db_manager.get_session() as session:
+            result = await session.execute(text("SELECT 1"))
+            _logger.info("✅ Database connection successful")
+    except Exception as e:
+        _logger.error(
+            f"❌ Database connection failed: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        raise  # Fail fast if database is unreachable
+
+    # Create database tables if they don't exist
+    try:
+        _logger.info("Creating/verifying database tables...")
+
+        async with db_manager.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all, checkfirst=True)
+        _logger.info("✅ Database tables created/verified successfully")
+    except Exception as e:
+        _logger.error(
+            f"❌ Failed to create database tables: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
+        raise
+
+    try:
+        _logger.info("Creating/verifying database tables...")
+
+        async with db_manager.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all, checkfirst=True)
+
+        _logger.info("✅ Database tables created or verified successfully")
+
+    except (ProgrammingError, OperationalError) as e:
+        msg = str(e)
+        if "already exists" in msg or "DuplicateTableError" in msg:
+            _logger.warning("⚠️ Skipping existing indexes or tables.")
+        else:
+            _logger.error(f"❌ Failed to create database tables: {msg}", exc_info=True)
+            raise  # Fail fast if tables can't be created
+
+    _logger.info("=" * 80)
+
+    yield  # Application runs here
+
+    # Shutdown (if needed in the future)
+    _logger.info("MANAGE PETRO API - SHUTTING DOWN")
+
+
 app = FastAPI(
     title="Manage Petro API",
     description="API for managing fuel delivery operations with AI-powered route optimization",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 
@@ -71,13 +142,24 @@ async def healthz():
 # Configure logging early
 configure_logging()
 
+# Log CORS configuration for debugging
+_logger.info(f"Configuring CORS with {len(config.CORS_ORIGINS)} allowed origins")
+for origin in config.CORS_ORIGINS:
+    _logger.debug(f"  - Allowed origin: {origin}")
+if config.CORS_ORIGIN_REGEX:
+    _logger.info(f"CORS origin regex pattern: {config.CORS_ORIGIN_REGEX}")
+
 # Configure CORS
+# Use CORS origins from config (supports environment variables) for better production flexibility
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=config.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
+    allow_origin_regex=config.CORS_ORIGIN_REGEX,  # Support for dynamic URLs (e.g., Vercel previews)
 )
 
 # Initialize services
@@ -269,7 +351,7 @@ async def get_drivers(
         drivers = []
         for driver_orm in drivers_orm:
             # Calculate current shift hours (today)
-            today_start = datetime.now().replace(
+            today_start = datetime.now(timezone.utc).replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
             shift_query = select(DriverShiftORM).where(
@@ -287,7 +369,7 @@ async def get_drivers(
             )
 
             # Calculate weekly hours (last 7 days)
-            week_start = datetime.now() - timedelta(days=7)
+            week_start = datetime.now(timezone.utc) - timedelta(days=7)
             week_query = select(DriverShiftORM).where(
                 and_(
                     DriverShiftORM.driver_id == driver_orm.id,
@@ -363,7 +445,9 @@ async def get_driver(
             raise_404("Driver not found")
 
         # Calculate current shift hours
-        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         shift_query = select(DriverShiftORM).where(
             and_(
                 DriverShiftORM.driver_id == driver_orm.id,
@@ -377,7 +461,7 @@ async def get_driver(
         current_shift_hours = sum((shift.total_hours or 0) for shift in active_shifts)
 
         # Calculate weekly hours
-        week_start = datetime.now() - timedelta(days=7)
+        week_start = datetime.now(timezone.utc) - timedelta(days=7)
         week_query = select(DriverShiftORM).where(
             and_(
                 DriverShiftORM.driver_id == driver_orm.id,
@@ -604,24 +688,39 @@ async def register_user(
     user_data: UserCreate, session: AsyncSession = Depends(get_db_session)
 ):
     """Register a new user using SQLAlchemy 2.0"""
+    _logger.info(
+        f"Registration attempt for username: {user_data.username}, email: {user_data.email}"
+    )
     try:
+        _logger.debug("Calling auth_service.create_user...")
         user = await auth_service.create_user(
             session=session,
             username=user_data.username,
             email=user_data.email,
             password=user_data.password,
         )
+        _logger.info(f"User created successfully: {user.username} (ID: {user.id})")
+
         # Convert SQLAlchemy model to Pydantic response model
-        return User(
+        response = User(
             id=user.id,
             username=user.username,
             email=user.email,
             is_active=user.is_active,
             created_at=user.created_at,
         )
-    except HTTPException:
+        _logger.debug(f"Returning user response: {response.username}")
+        return response
+    except HTTPException as he:
+        _logger.warning(
+            f"Registration failed with HTTPException: {he.status_code} - {he.detail}"
+        )
         raise
     except Exception as e:
+        _logger.error(
+            f"Registration failed with unexpected error: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
         raise_500("Registration failed", e)
 
 
