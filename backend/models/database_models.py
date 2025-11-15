@@ -24,7 +24,6 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
 from constants import (
     DEFAULT_FUEL_TYPE,
     DEFAULT_LOW_FUEL_THRESHOLD,
