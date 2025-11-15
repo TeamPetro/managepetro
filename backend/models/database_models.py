@@ -4,6 +4,7 @@ SQLAlchemy 2.0 database models for ManagePetro application.
 These models correspond to the database schema and provide type-safe
 database operations using SQLAlchemy's modern declarative approach.
 """
+
 from sqlalchemy.schema import CreateIndex
 from sqlalchemy.ext.compiler import compiles
 from datetime import datetime, date
@@ -60,8 +61,12 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Timestamps are set by application code with timezone-aware datetimes
     # Using DateTime(timezone=True) for PostgreSQL TIMESTAMP WITH TIME ZONE compatibility
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
 
     # Indexes for performance
     __table_args__ = (
@@ -353,7 +358,9 @@ class DriverShift(Base):
     driver_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False
     )
-    shift_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    shift_start: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     shift_end: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     total_hours: Mapped[Optional[float]] = mapped_column(DECIMAL(4, 2))
     break_hours: Mapped[float] = mapped_column(DECIMAL(4, 2), default=0)
