@@ -97,7 +97,6 @@ async def lifespan(_app: FastAPI):
         )
         raise
 
-
     try:
         _logger.info("Creating/verifying database tables...")
 
@@ -112,8 +111,7 @@ async def lifespan(_app: FastAPI):
             _logger.warning("⚠️ Skipping existing indexes or tables.")
         else:
             _logger.error(f"❌ Failed to create database tables: {msg}", exc_info=True)
-            raise # Fail fast if tables can't be created
-
+            raise  # Fail fast if tables can't be created
 
     _logger.info("=" * 80)
 
@@ -353,7 +351,7 @@ async def get_drivers(
         drivers = []
         for driver_orm in drivers_orm:
             # Calculate current shift hours (today)
-            today_start = datetime.now().replace(
+            today_start = datetime.now(timezone.utc).replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
             shift_query = select(DriverShiftORM).where(
@@ -371,7 +369,7 @@ async def get_drivers(
             )
 
             # Calculate weekly hours (last 7 days)
-            week_start = datetime.now() - timedelta(days=7)
+            week_start = datetime.now(timezone.utc) - timedelta(days=7)
             week_query = select(DriverShiftORM).where(
                 and_(
                     DriverShiftORM.driver_id == driver_orm.id,
@@ -447,7 +445,9 @@ async def get_driver(
             raise_404("Driver not found")
 
         # Calculate current shift hours
-        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         shift_query = select(DriverShiftORM).where(
             and_(
                 DriverShiftORM.driver_id == driver_orm.id,
@@ -461,7 +461,7 @@ async def get_driver(
         current_shift_hours = sum((shift.total_hours or 0) for shift in active_shifts)
 
         # Calculate weekly hours
-        week_start = datetime.now() - timedelta(days=7)
+        week_start = datetime.now(timezone.utc) - timedelta(days=7)
         week_query = select(DriverShiftORM).where(
             and_(
                 DriverShiftORM.driver_id == driver_orm.id,
