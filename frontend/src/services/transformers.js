@@ -130,6 +130,14 @@ export function transformDispatchResponse(apiData) {
   const current_driver_id = truck.current_driver_id || null;
   const truck_code = truck.code || truck.truck_id || null;
 
+  // Extract numeric values from dispatch_summary for easier access
+  const total_distance_km = dispatch_summary.total_distance
+    ? parseFloat(dispatch_summary.total_distance.match(/[\d.]+/)?.[0] || 0)
+    : 0;
+  const estimated_duration_hours = dispatch_summary.estimated_duration
+    ? parseFloat(dispatch_summary.estimated_duration.match(/[\d.]+/)?.[0] || 0)
+    : 0;
+
   // Return the data in the structure expected by DispatchResultCard and Execute Dispatch
   return {
     dispatch_summary,
@@ -141,6 +149,8 @@ export function transformDispatchResponse(apiData) {
     stations_available,
     depot_location,
     ai_analysis,
+    total_distance_km,
+    estimated_duration_hours,
     // Include any additional fields that might be added by backend
     ...otherFields,
   };

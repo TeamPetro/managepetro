@@ -108,12 +108,54 @@ function DispatchRecommendationCard({
           </div>
         </div>
         <div className="bg-white rounded-lg p-3 border border-gray-200">
-          <div className="text-xs text-gray-500">Fuel</div>
+          <div className="text-xs text-gray-500">Delivery</div>
           <div className="text-lg font-bold text-gray-900">
             {recommendation.total_fuel_delivery}
           </div>
         </div>
       </div>
+
+      {/* Truck Fuel Status */}
+      {(recommendation.truck_capacity_liters ||
+        recommendation.truck_fuel_level_percent !== undefined) && (
+        <div className="mb-4 bg-white rounded-lg p-3 border border-gray-200">
+          <div className="text-xs text-gray-500 mb-2">Truck Cargo Status</div>
+          <div className="flex items-center justify-between gap-4">
+            {recommendation.truck_capacity_liters && (
+              <div className="flex-1">
+                <div className="text-xs text-gray-600">Capacity</div>
+                <div className="text-sm font-semibold text-gray-900">
+                  {recommendation.truck_capacity_liters.toLocaleString()} L
+                </div>
+              </div>
+            )}
+            {recommendation.truck_fuel_level_percent !== undefined && (
+              <div className="flex-1">
+                <div className="text-xs text-gray-600">Cargo Level</div>
+                <div className="text-sm font-semibold text-gray-900">
+                  {recommendation.truck_fuel_level_percent}%
+                </div>
+              </div>
+            )}
+            {recommendation.cargo_fuel_liters !== undefined && (
+              <div className="flex-1">
+                <div className="text-xs text-gray-600">Current Cargo</div>
+                <div className="text-sm font-semibold text-gray-900">
+                  {recommendation.cargo_fuel_liters.toLocaleString()} L
+                </div>
+              </div>
+            )}
+            {recommendation.truck_fuel_type && (
+              <div className="flex-1">
+                <div className="text-xs text-gray-600">Fuel Type</div>
+                <div className="text-sm font-semibold text-gray-900">
+                  {recommendation.truck_fuel_type}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Route Summary */}
       {recommendation.route_summary && (
