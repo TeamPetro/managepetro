@@ -63,13 +63,19 @@ class DatabaseManager:
         logger.debug("Creating async database engine...")
         self.engine: AsyncEngine = create_async_engine(
             database_url,
-            pool_size=10,
-            max_overflow=20,
-            pool_pre_ping=True,
-            pool_recycle=3600,
+            pool_size=config.DB_POOL_SIZE,
+            max_overflow=config.DB_MAX_OVERFLOW,
+            pool_pre_ping=config.DB_POOL_PRE_PING,
+            pool_recycle=config.DB_POOL_RECYCLE,
+            pool_timeout=config.DB_POOL_TIMEOUT,
             echo=False,
         )
-        logger.info("Database engine created successfully")
+        logger.info(
+            f"Database engine created with pool_size={config.DB_POOL_SIZE}, "
+            f"max_overflow={config.DB_MAX_OVERFLOW}, "
+            f"pool_recycle={config.DB_POOL_RECYCLE}s, "
+            f"pool_timeout={config.DB_POOL_TIMEOUT}s"
+        )
 
         # Session factory
         self.async_session_maker = async_sessionmaker(

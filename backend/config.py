@@ -38,6 +38,13 @@ class Config:
     DB_NAME: str
     DB_USER: str
     DB_PASS: str
+    
+    # Database Connection Pooling (optional with defaults)
+    DB_POOL_SIZE: int
+    DB_MAX_OVERFLOW: int
+    DB_POOL_RECYCLE: int
+    DB_POOL_PRE_PING: bool
+    DB_POOL_TIMEOUT: int
 
     # JWT Configuration
     JWT_SECRET_KEY: str
@@ -109,6 +116,48 @@ class Config:
         self.DB_PASS = os.getenv("DB_PASS", "").strip()
         if not self.DB_PASS:
             missing_vars.append("DB_PASS")
+        
+        # Database Connection Pooling (Optional with smart defaults)
+        # Use environment-specific defaults: smaller pools for dev, larger for production
+        is_production = bool(os.getenv("DATABASE_URL"))
+        
+        # Pool size: number of connections maintained in the pool
+        default_pool_size = 20 if is_production else 5
+        try:
+            self.DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", str(default_pool_size)).strip())
+        except ValueError:
+            raise ConfigurationError(
+                f"DB_POOL_SIZE must be a valid integer, got: {os.getenv('DB_POOL_SIZE')}"
+            )
+        
+        # Max overflow: additional connections beyond pool_size
+        default_max_overflow = 30 if is_production else 10
+        try:
+            self.DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", str(default_max_overflow)).strip())
+        except ValueError:
+            raise ConfigurationError(
+                f"DB_MAX_OVERFLOW must be a valid integer, got: {os.getenv('DB_MAX_OVERFLOW')}"
+            )
+        
+        # Pool recycle: recycle connections older than this (in seconds)
+        try:
+            self.DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "3600").strip())
+        except ValueError:
+            raise ConfigurationError(
+                f"DB_POOL_RECYCLE must be a valid integer, got: {os.getenv('DB_POOL_RECYCLE')}"
+            )
+        
+        # Pool pre-ping: test connections before using them
+        pre_ping_str = os.getenv("DB_POOL_PRE_PING", "True").strip().lower()
+        self.DB_POOL_PRE_PING = pre_ping_str in ("true", "1", "yes", "on")
+        
+        # Pool timeout: how long to wait for a connection
+        try:
+            self.DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30").strip())
+        except ValueError:
+            raise ConfigurationError(
+                f"DB_POOL_TIMEOUT must be a valid integer, got: {os.getenv('DB_POOL_TIMEOUT')}"
+            )
 
         # JWT Configuration (Required for security)
         self.JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "").strip()
