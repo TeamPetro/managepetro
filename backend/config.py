@@ -135,21 +135,20 @@ class Config:
         
         # CORS Configuration
         # Support comma-separated list of allowed origins from environment
-        # Falls back to default safe origins if not specified
+        # Falls back to localhost-only for local development if not specified
         cors_origins_env = os.getenv("CORS_ORIGINS", "").strip()
         if cors_origins_env:
             # Split by comma and strip whitespace from each origin
             self.CORS_ORIGINS = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
         else:
-            # Default CORS origins for local development and known production frontend
+            # Default CORS origins: localhost only for local development
+            # Production deployments MUST set CORS_ORIGINS environment variable explicitly
             self.CORS_ORIGINS = [
                 "http://localhost:3000",
                 "http://localhost:3001",
                 "http://127.0.0.1:3000",
                 "http://127.0.0.1:3001",
                 "http://localhost:5173",  # Vite dev server
-                "https://managepetro.vercel.app", 
-                "https://manage-petro-frontend.vercel.app",  # Production frontend
             ]
         
         # CORS Origin Regex Pattern (optional)
