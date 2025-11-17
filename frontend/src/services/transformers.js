@@ -50,13 +50,22 @@ export function transformRouteResponse(apiData) {
   const availableTrucks = apiData.available_trucks || [];
   const aiAnalysis = apiData.ai_analysis || "";
   const dataSources = apiData.data_sources || {};
+  
+  // Enhanced mapping data
+  const routeGeometry = apiData.route_geometry || [];
+  const maneuvers = apiData.maneuvers || [];
+  const routeMetadata = apiData.route_metadata || {};
 
   return {
     eta: {
+      from: routeSummary.from || "N/A",
+      to: routeSummary.to || "N/A",
       duration: routeSummary.estimated_duration || "N/A",
       distance: routeSummary.total_distance || "N/A",
-      recommendedArrival: routeSummary.recommended_arrival_time || null,
-      recommendedDeparture: routeSummary.best_departure_time || null,
+      estimated_departure: routeSummary.best_departure_time || null,
+      estimated_arrival: routeSummary.recommended_arrival_time || null,
+      total_distance: routeSummary.total_distance || "N/A",
+      vehicle_type: routeSummary.vehicle_type || "Fuel Truck",
     },
     instructions: directions.map((step, index) => ({
       id: step.step_id || step.step || index + 1,
@@ -90,6 +99,9 @@ export function transformRouteResponse(apiData) {
     availableTrucks: availableTrucks,
     aiAnalysis: aiAnalysis,
     dataSources: dataSources,
+    route_geometry: routeGeometry,
+    maneuvers: maneuvers,
+    route_metadata: routeMetadata,
   };
 }
 

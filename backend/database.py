@@ -3,8 +3,9 @@ SQLAlchemy 2.0 database configuration and session management.
 
 This module provides async database connectivity using SQLAlchemy 2.0
 with proper connection pooling and session management for FastAPI.
-""" 
+"""
 
+from fastapi import HTTPException
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -14,34 +15,52 @@ from sqlalchemy.ext.asyncio import (
 )
 from models.database_models import Base
 from config import config
+import os
+import logging
 
 
 class DatabaseManager:
     """Manages SQLAlchemy async database connections and sessions."""
 
-import os
 
 class DatabaseManager:
     """Manages SQLAlchemy async database connections and sessions."""
 
     def __init__(self):
+        logger = logging.getLogger(__name__)
+
         # Check if a DATABASE_URL env var is defined (Render)
         database_url = os.getenv("DATABASE_URL")
 
         if database_url:
+            logger.info("DATABASE_URL found, using PostgreSQL on Render")
             # Use Render's managed Postgres database
             # Render URLs look like: postgres://user:pass@host:5432/dbname
             # SQLAlchemy async driver for Postgres uses "postgresql+asyncpg://"
             if database_url.startswith("postgres://"):
-                database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+                original_url = database_url
+                database_url = database_url.replace(
+                    "postgres://", "postgresql+asyncpg://", 1
+                )
+                logger.info(
+                    f"Converted database URL from postgres:// to postgresql+asyncpg://"
+                )
+            logger.info(
+                f"Database host: {database_url.split('@')[1].split('/')[0] if '@' in database_url else 'unknown'}"
+            )
         else:
+            logger.info("DATABASE_URL not found, using local MySQL")
             # Fallback to local MySQL (your dev setup)
             database_url = (
                 f"mysql+aiomysql://{config.DB_USER}:{config.DB_PASS}"
                 f"@{config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}"
             )
+            logger.info(
+                f"MySQL connection: {config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}"
+            )
 
         # SQLAlchemy 2.0 async engine configuration
+        logger.debug("Creating async database engine...")
         self.engine: AsyncEngine = create_async_engine(
             database_url,
             pool_size=10,
@@ -50,6 +69,7 @@ class DatabaseManager:
             pool_recycle=3600,
             echo=False,
         )
+        logger.info("Database engine created successfully")
 
         # Session factory
         self.async_session_maker = async_sessionmaker(
@@ -58,7 +78,6 @@ class DatabaseManager:
             expire_on_commit=False,
             autoflush=True,
         )
-
 
     def get_session(self):
         """
@@ -104,9 +123,23 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
             result = await session.execute(stmt)
             return result.scalars().all()
     """
+    logger = logging.getLogger(__name__)
+    logger.debug("get_db_session: Creating new database session")
+
     async with db_manager.get_session() as session:
         try:
+            logger.debug("get_db_session: Session created, yielding to endpoint")
             yield session
-        except Exception:
+            logger.debug("get_db_session: Endpoint completed successfully")
+        except Exception as e:
+            # Don't log expected auth failures (401) at ERROR level
+
+            if isinstance(e, HTTPException) and e.status_code == 401:
+                logger.debug(f"get_db_session: Auth failure (expected): {e.detail}")
+            else:
+                logger.error(
+                    f"get_db_session: Exception during session: {type(e).__name__}: {str(e)}",
+                    exc_info=True,
+                )
             await session.rollback()
             raise

@@ -15,6 +15,7 @@ Example:
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_core.language_models.chat_models import BaseChatModel
 from config import config
 
@@ -60,8 +61,15 @@ def get_chat_model(model_id: str, temperature: float = 0.3) -> BaseChatModel:
             api_key=config.GEMINI_API_KEY,
         )
 
+    elif provider == "groq":
+        return ChatGroq(
+            model=name,
+            temperature=temperature,
+            api_key=config.GROQ_API_KEY,
+        )
+
     else:
         raise ValueError(
             f"Unknown provider '{provider}'. "
-            f"Valid prefixes: 'openai', 'anthropic', 'google'."
+            f"Valid prefixes: 'openai', 'anthropic', 'google', 'groq'."
         )
