@@ -11,7 +11,7 @@ function InstructionsList({ instructions }) {
         {instructions.map((instruction, index) => (
           <div
             key={instruction.id}
-            className="flex items-start space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-start space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-lg hover:bg-gray-100 transition-colors"
           >
             {/* Step Number */}
             <div className="flex-shrink-0">
