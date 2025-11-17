@@ -50,19 +50,19 @@ function WeatherImpactCard({ weatherImpact }) {
         <div className="bg-green-50 rounded-lg p-3 sm:p-4 border border-green-100">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2">
+              <p className="text-xs sm:text-sm font-medium text-gray-800 mb-2">
                 Destination: {toLocation.city || "N/A"}
               </p>
               <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
                 <div>
-                  <span className="text-gray-600">Temp:</span>
-                  <span className="ml-1 font-medium text-gray-900">
+                  <span className="text-gray-800">Temp:</span>
+                  <span className="ml-1 font-medium text-slate-800">
                     {toLocation.temperature || "N/A"}
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-600">Wind:</span>
-                  <span className="ml-1 font-medium text-gray-900">
+                  <span className="text-gray-800">Wind:</span>
+                  <span className="ml-1 font-medium text-slate-800">
                     {toLocation.wind || "N/A"}
                   </span>
                 </div>
