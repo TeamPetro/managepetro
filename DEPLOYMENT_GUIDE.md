@@ -22,32 +22,38 @@
 Before we begin, make sure you have:
 
 ### 🖥️ **Two Separate Web Servers**
+
 - **Server 1**: For the Backend (the server that does the calculations)
 - **Server 2**: For the Frontend (the website users see)
 - Both servers need to be able to run programs and connect to the internet
 
 ### 🗄️ **A Database**
+
 - You need either:
   - A MySQL database (version 8.0 or higher), OR
   - A PostgreSQL database (version 13 or higher)
 - This can be on a third server, or on the same server as your backend
 
 ### 🔑 **API Keys** (Free accounts work!)
+
 You'll need to sign up for these services and get free API keys:
 
 1. **Weather API Key**
+
    - Go to: https://www.weatherapi.com
    - Click "Sign Up"
    - After signing up, find your API key in your dashboard
    - Copy it somewhere safe (like Notepad)
 
 2. **TomTom API Key**
+
    - Go to: https://developer.tomtom.com
    - Click "Sign Up"
    - After signing up, create a new application
    - Copy your API key somewhere safe
 
 3. **Google Gemini API Key**
+
    - Go to: https://makersuite.google.com/app/apikey
    - Sign in with your Google account
    - Click "Create API Key"
@@ -71,6 +77,7 @@ ManagePetro has **three main parts**:
 3. **Database** - Where all the data is stored (like a store's filing cabinet)
 
 These three parts need to talk to each other:
+
 - Frontend talks to Backend
 - Backend talks to Database
 
@@ -99,6 +106,7 @@ We'll set up each part in order.
    - **Database Password** (usually provided or you set it)
 
 **Example Connection Details:**
+
 ```
 Host: managepetro-db-123.postgres.database.azure.com
 Port: 5432
@@ -116,6 +124,7 @@ Now we need to add the tables and structure to your database.
 3. You'll need to run this SQL file on your database
 
 **If using a web interface (like pgAdmin or your hosting service's SQL console):**
+
 1. Open the SQL console/query tool
 2. Copy the entire contents of `backend/db/schema.sql`
 3. Paste it into the SQL console
@@ -123,9 +132,11 @@ Now we need to add the tables and structure to your database.
 5. Wait for it to finish (you should see "Success" or similar)
 
 **If using command line:**
+
 ```bash
 psql -h your-host -U your-username -d your-database-name -f backend/db/schema.sql
 ```
+
 (Replace `your-host`, `your-username`, and `your-database-name` with your actual details)
 
 ---
@@ -155,6 +166,7 @@ psql -h your-host -U your-username -d your-database-name -f backend/db/schema.sq
 3. Run this SQL file on your MySQL database
 
 **If using phpMyAdmin or similar:**
+
 1. Log into phpMyAdmin
 2. Select your database from the left sidebar
 3. Click the "Import" tab
@@ -163,10 +175,191 @@ psql -h your-host -U your-username -d your-database-name -f backend/db/schema.sq
 6. Wait for success message
 
 **If using command line:**
+
 ```bash
 mysql -h your-host -u your-username -p your-database-name < backend/db/schema.sql
 ```
+
 (Enter your password when prompted)
+
+---
+
+### 🎯 Special Section: Automatic Database Seeding on Render
+
+**⚠️ READ THIS IF YOU'RE DEPLOYING TO RENDER.COM ⚠️**
+
+Great news! If you're deploying to Render.com using the included `render.yaml` blueprint file, **your database will be initialized automatically**. You don't need to manually run `schema.sql` or `seed.sql`!
+
+#### How It Works
+
+When you deploy to Render using the blueprint:
+
+1. **Before your backend starts**, Render runs `python init_production_db.py`
+2. This script checks if your database has tables
+3. If **no tables exist**, it runs `backend/db/schema.sql` to create them
+4. Then it checks if your database has any data
+5. If **no data exists**, it runs `backend/db/seed.sql` to add demo users, stations, trucks, etc.
+
+This happens **automatically every time you deploy**. The script is smart - it won't duplicate data or break existing tables.
+
+#### What Gets Seeded
+
+The `seed.sql` file adds:
+
+- 👤 **Demo users** (for logging in and testing)
+- ⛽ **Gas stations** (with locations, fuel levels, capacity)
+- 🚚 **Trucks** (with drivers, fuel levels, locations)
+- 📦 **Recent delivery records** (for testing the dashboard)
+- 🌦️ **Weather data** (for route optimization)
+
+#### Checking If Seeding Worked
+
+After your first deployment to Render:
+
+1. Go to your Render dashboard
+2. Click on your **backend service**
+3. Click on the **"Logs"** tab
+4. Look for these lines near the start of your deployment:
+
+**If tables needed to be created:**
+
+```
+Tables do not exist. Running schema.sql...
+Schema initialization completed successfully!
+```
+
+**If data needed to be seeded:**
+
+```
+No data found in database. Running seed.sql...
+Database seeding completed successfully!
+```
+
+**If everything is already set up:**
+
+```
+Tables already exist. Skipping schema initialization.
+Data already exists in database. Skipping seeding.
+```
+
+#### Troubleshooting: "My Production Database is Empty!"
+
+If you deployed but don't see any seeded data:
+
+**Step 1: Check the deployment logs**
+
+1. Go to Render dashboard → Your backend service → Logs
+2. Search for "schema.sql" or "seed.sql"
+3. Look for error messages
+
+**Step 2: Common issues and fixes**
+
+**Problem:** Logs say "ERROR: Could not connect to database"
+
+- **Solution:** Check that your Render database is running (Render dashboard → Databases)
+- Make sure the `DATABASE_URL` environment variable is connected to your backend service
+
+**Problem:** Logs say "ERROR: relation already exists"
+
+- **Solution:** This is fine! It means tables were already created. Check if data exists.
+
+**Problem:** No logs about database initialization at all
+
+- **Solution:** The `render.yaml` file might not be set up correctly. Check that:
+  1. `render.yaml` exists in your repository root
+  2. You deployed using "New → Blueprint" (not "New → Web Service")
+  3. The backend service has `preDeployCommand: python init_production_db.py`
+
+**Step 3: Manual fix - Re-seed the database**
+
+If automatic seeding failed, you can manually run the seed script:
+
+1. In Render dashboard, go to your backend service
+2. Click the **"Shell"** tab (this opens a terminal)
+3. Run these commands:
+
+```bash
+cd /opt/render/project/src
+python init_production_db.py
+```
+
+4. Check the output for success/error messages
+
+**Step 4: Nuclear option - Reset everything**
+
+If you want to completely wipe and re-create the database:
+
+⚠️ **WARNING: THIS DELETES ALL DATA** ⚠️
+
+1. In Render dashboard, go to your **Database** (not backend service)
+2. Click **"Info"** tab
+3. Scroll down and click **"Delete Database"**
+4. Create a new database with the same name
+5. Reconnect it to your backend service
+6. Trigger a new deployment (push to GitHub or click "Manual Deploy")
+7. The automatic seeding will run on the fresh database
+
+#### Understanding the Initialization Script
+
+The `init_production_db.py` script is located in your `backend/` folder. Here's what it does:
+
+```
+┌─────────────────────────────────────┐
+│   Render starts your deployment     │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  preDeployCommand runs:              │
+│  python init_production_db.py        │
+└────────────┬────────────────────────┘
+             │
+             ▼
+      ┌──────────────┐
+      │ Do tables    │ NO  ┌──────────────────────┐
+      │ exist?       ├────►│ Run schema.sql       │
+      └──────┬───────┘     │ (Create tables)      │
+             │ YES         └──────────────────────┘
+             ▼
+      ┌──────────────┐
+      │ Does data    │ NO  ┌──────────────────────┐
+      │ exist?       ├────►│ Run seed.sql         │
+      └──────┬───────┘     │ (Add demo data)      │
+             │ YES         └──────────────────────┘
+             ▼
+┌─────────────────────────────────────┐
+│    Backend server starts normally    │
+└─────────────────────────────────────┘
+```
+
+**Key points:**
+
+- ✅ Safe to run multiple times (won't duplicate data)
+- ✅ Runs automatically before every deployment
+- ✅ Handles PostgreSQL/MySQL differences automatically
+- ✅ Logs everything so you can see what happened
+
+#### When to Re-Seed Manually
+
+You might want to manually re-run seeding if:
+
+1. You deleted data from your production database and want it back
+2. The `seed.sql` file was updated with new demo data
+3. Automatic seeding failed during deployment
+4. You want to reset to a "clean slate" for testing
+
+To manually re-seed:
+
+```bash
+# In the Render Shell for your backend service:
+python init_production_db.py
+```
+
+Or you can run the SQL files directly if you have database access:
+
+```bash
+psql $DATABASE_URL -f backend/db/seed.sql
+```
 
 ---
 
@@ -179,10 +372,13 @@ The backend is a Python application that needs to run constantly.
 Log into your backend server using SSH or your hosting provider's terminal.
 
 **Check if Python is installed:**
+
 ```bash
 python --version
 ```
+
 or
+
 ```bash
 python3 --version
 ```
@@ -190,17 +386,20 @@ python3 --version
 You need **Python 3.10 or higher**. If you don't have it, install it:
 
 **On Ubuntu/Debian:**
+
 ```bash
 sudo apt update
 sudo apt install python3.10 python3.10-venv python3-pip
 ```
 
 **On CentOS/RHEL:**
+
 ```bash
 sudo yum install python310 python310-pip
 ```
 
 **On Windows Server:**
+
 1. Download Python from https://www.python.org/downloads/
 2. Run the installer
 3. **IMPORTANT**: Check "Add Python to PATH" during installation
@@ -214,6 +413,7 @@ You need to get the backend code onto your server.
 **Option A: Using Git (Recommended)**
 
 1. Install git if not already installed:
+
 ```bash
 # Ubuntu/Debian
 sudo apt install git
@@ -223,6 +423,7 @@ sudo yum install git
 ```
 
 2. Clone the repository:
+
 ```bash
 cd /home/your-username
 git clone YOUR_REPOSITORY_URL
@@ -240,11 +441,13 @@ cd "ISSP Project/backend"
 ### Step 2.3: Install Backend Dependencies
 
 Navigate to where your backend code is:
+
 ```bash
 cd /path/to/your/backend
 ```
 
 Create a virtual environment (this keeps everything organized):
+
 ```bash
 python3 -m venv venv
 ```
@@ -252,11 +455,13 @@ python3 -m venv venv
 Activate the virtual environment:
 
 **On Linux/Mac:**
+
 ```bash
 source venv/bin/activate
 ```
 
 **On Windows:**
+
 ```bash
 venv\Scripts\activate
 ```
@@ -264,6 +469,7 @@ venv\Scripts\activate
 You should now see `(venv)` at the beginning of your terminal prompt.
 
 Install all required packages:
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -355,7 +561,7 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # IMPORTANT: Replace this with your ACTUAL frontend URL
 # This tells the backend which websites are allowed to connect to it
-# 
+#
 # If your frontend is at https://managepetro.example.com, put:
 CORS_ORIGINS=https://managepetro.example.com
 #
@@ -410,6 +616,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 You should see output like:
+
 ```
 INFO:     Started server process
 INFO:     Waiting for application startup.
@@ -420,6 +627,7 @@ INFO:     Uvicorn running on http://0.0.0.0:8000
 **Test if it works:**
 
 Open a web browser and go to:
+
 ```
 http://your-backend-server-ip:8000/docs
 ```
@@ -463,6 +671,7 @@ WantedBy=multi-user.target
 ```
 
 **IMPORTANT: Replace these:**
+
 - `your-username` with your actual Linux username
 - `/path/to/your/backend` with the actual path (like `/home/john/ISSP Project/backend`)
 
@@ -485,6 +694,7 @@ sudo systemctl status managepetro-backend
 You should see "active (running)" in green.
 
 **To view logs if something goes wrong:**
+
 ```bash
 sudo journalctl -u managepetro-backend -f
 ```
@@ -496,15 +706,18 @@ sudo journalctl -u managepetro-backend -f
 1. Install Node.js and PM2:
 
 **On Ubuntu/Debian:**
+
 ```bash
 sudo apt install nodejs npm
 sudo npm install -g pm2
 ```
 
 **On Windows:**
+
 - Download Node.js from https://nodejs.org
 - Install it
 - Open Command Prompt as Administrator:
+
 ```bash
 npm install -g pm2
 ```
@@ -531,6 +744,7 @@ pm2 status
 ```
 
 **To view logs:**
+
 ```bash
 pm2 logs managepetro-backend
 ```
@@ -540,6 +754,7 @@ pm2 logs managepetro-backend
 ### Step 2.8: Set Up a Reverse Proxy (Recommended)
 
 For production, you should use Nginx to:
+
 - Handle HTTPS (secure connections)
 - Improve performance
 - Add security
@@ -616,23 +831,27 @@ Log into your frontend server.
 **Install Node.js:**
 
 **On Ubuntu/Debian:**
+
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
 **On CentOS/RHEL:**
+
 ```bash
 curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
 sudo yum install -y nodejs
 ```
 
 **On Windows Server:**
+
 1. Download Node.js from https://nodejs.org
 2. Run the installer
 3. Restart your computer
 
 **Verify installation:**
+
 ```bash
 node --version  # Should show v20.x.x or higher
 npm --version   # Should show 10.x.x or higher
@@ -659,16 +878,19 @@ Use FileZilla, WinSCP, or your hosting file manager to upload the entire `fronte
 ### Step 3.3: Configure Frontend Environment Variables
 
 1. Navigate to your frontend folder:
+
 ```bash
 cd /path/to/your/frontend
 ```
 
 2. Create your `.env` file:
+
 ```bash
 cp .env.example .env
 ```
 
 3. Edit the `.env` file:
+
 ```bash
 nano .env
 ```
@@ -682,7 +904,7 @@ nano .env
 
 # IMPORTANT: Use your ACTUAL backend URL here
 # This is the URL where you deployed your backend in Part 2
-# 
+#
 # Examples:
 # - If using Nginx with domain: https://api.your-domain.com
 # - If using IP directly: http://123.456.789.012:8000
@@ -811,6 +1033,7 @@ Your frontend is now live at: `https://your-domain.com`
 If you're using Vercel, Netlify, or similar:
 
 1. **For Vercel:**
+
    - Go to https://vercel.com
    - Click "Import Project"
    - Connect your Git repository
@@ -834,6 +1057,7 @@ Now let's make sure everything works together!
 ### Step 4.1: Test Backend Directly
 
 Open your web browser and go to:
+
 ```
 https://api.your-domain.com/docs
 ```
@@ -843,6 +1067,7 @@ You should see the API documentation. This means your backend is working!
 ### Step 4.2: Test Frontend
 
 Open your web browser and go to:
+
 ```
 https://your-domain.com
 ```
@@ -852,6 +1077,7 @@ You should see the ManagePetro login page.
 ### Step 4.3: Test the Connection
 
 1. On the login page, try to create a new account:
+
    - Click "Sign Up" or "Register"
    - Fill in the form
    - Click "Create Account"
@@ -877,20 +1103,26 @@ You should see the ManagePetro login page.
 **What it means:** The backend doesn't recognize the frontend's URL.
 
 **Solution:**
+
 1. Go to your backend server
 2. Edit the `.env` file:
+
 ```bash
 cd /path/to/your/backend
 nano .env
 ```
+
 3. Find the line `CORS_ORIGINS=`
 4. Make sure it exactly matches your frontend URL:
+
 ```bash
 CORS_ORIGINS=https://your-frontend-domain.com
 ```
+
 5. NO trailing slash!
 6. Save the file
 7. Restart the backend:
+
 ```bash
 sudo systemctl restart managepetro-backend
 ```
@@ -902,18 +1134,24 @@ sudo systemctl restart managepetro-backend
 **What it means:** The frontend can't reach the backend.
 
 **Solution:**
+
 1. Go to your frontend server
 2. Check the `.env` file:
+
 ```bash
 cd /path/to/your/frontend
 cat .env
 ```
+
 3. Make sure `VITE_API_BASE_URL` is correct
 4. Test if the backend is reachable:
+
 ```bash
 curl https://api.your-domain.com/docs
 ```
+
 5. If you changed `.env`, rebuild the frontend:
+
 ```bash
 npm run build
 sudo systemctl restart nginx
@@ -926,7 +1164,9 @@ sudo systemctl restart nginx
 **What it means:** Something in your configuration is wrong.
 
 **Solution:**
+
 1. Check the logs:
+
 ```bash
 # If using systemd:
 sudo journalctl -u managepetro-backend -n 50
@@ -934,6 +1174,7 @@ sudo journalctl -u managepetro-backend -n 50
 # If using PM2:
 pm2 logs managepetro-backend
 ```
+
 2. Common issues in logs:
    - "Can't connect to database" → Check your `DB_HOST`, `DB_USER`, `DB_PASS` in `.env`
    - "Invalid API key" → Check your `WEATHER_API_KEY`, `TOMTOM_API_KEY`, `GEMINI_API_KEY`
@@ -946,12 +1187,67 @@ pm2 logs managepetro-backend
 **What it means:** Either the account doesn't exist, or the database connection is broken.
 
 **Solution:**
+
 1. Create a test user directly in the database
 2. Or check backend logs when you try to login:
+
 ```bash
 sudo journalctl -u managepetro-backend -f
 ```
+
 3. Try the login and watch what error appears in the logs
+
+---
+
+### Problem: Production database is empty (Render only)
+
+**What it means:** The automatic seeding didn't run or failed during deployment.
+
+**Solution:**
+
+1. **First, check if you used the Blueprint deployment method:**
+
+   - You MUST deploy using "New → Blueprint" (not "New → Web Service")
+   - The `render.yaml` file must be in your repository root
+   - Check Render dashboard → Your service → Settings → Build & Deploy
+   - Pre-Deploy Command should show: `python init_production_db.py`
+
+2. **Check the deployment logs:**
+
+   - Render dashboard → Your backend service → Logs
+   - Look for "schema.sql" or "seed.sql" in the logs
+   - Common error messages:
+     - "Could not connect to database" → Database isn't running or not connected
+     - "relation already exists" → Tables exist but data might be missing
+     - "No such file" → `init_production_db.py` or SQL files are missing
+
+3. **Quick fix - Manually run seeding:**
+
+   ```bash
+   # In Render Shell (Dashboard → Backend Service → Shell tab):
+   cd /opt/render/project/src
+   python init_production_db.py
+   ```
+
+   - This will check what's missing and add it
+   - You'll see output telling you what it did
+
+4. **If tables exist but no data:**
+
+   ```bash
+   # Check if tables exist:
+   psql $DATABASE_URL -c "SELECT COUNT(*) FROM users;"
+
+   # If it returns 0, manually run seed file:
+   psql $DATABASE_URL -f backend/db/seed.sql
+   ```
+
+5. **Nuclear option - Fresh start:**
+   ⚠️ **This deletes everything!**
+   - Render dashboard → Your Database → Info tab → Delete Database
+   - Create new database (same name)
+   - Reconnect to backend service
+   - Trigger new deployment (it will auto-seed the fresh database)
 
 ---
 
@@ -960,10 +1256,12 @@ sudo journalctl -u managepetro-backend -f
 **What it means:** The Google Maps API key is missing or invalid.
 
 **Solution:**
+
 1. Check your frontend `.env` file has `VITE_GOOGLE_MAPS_API_KEY`
 2. Make sure the key is valid at https://console.cloud.google.com
 3. Make sure "Maps JavaScript API" is enabled for your project
 4. Rebuild the frontend:
+
 ```bash
 cd /path/to/your/frontend
 npm run build
@@ -976,16 +1274,20 @@ npm run build
 **What it means:** The AI API key is missing or invalid.
 
 **Solution:**
+
 1. Check backend `.env` file has `GEMINI_API_KEY`
 2. Test the key is valid:
+
 ```bash
 curl -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=YOUR_KEY" \
   -H 'Content-Type: application/json' \
   -d '{"contents":[{"parts":[{"text":"Hello"}]}]}'
 ```
+
 3. If you see an error, get a new key from https://makersuite.google.com/app/apikey
 4. Update the `.env` file
 5. Restart backend:
+
 ```bash
 sudo systemctl restart managepetro-backend
 ```
@@ -997,6 +1299,7 @@ sudo systemctl restart managepetro-backend
 If you're still stuck:
 
 1. **Check the logs first:**
+
    - Backend: `sudo journalctl -u managepetro-backend -n 100`
    - Nginx: `sudo tail -f /var/log/nginx/error.log`
    - Frontend browser: Press F12, check Console tab
@@ -1004,6 +1307,7 @@ If you're still stuck:
 2. **Copy the exact error message** - it will help others help you
 
 3. **Document what you tried:**
+
    - What step were you on?
    - What command did you run?
    - What was the error?
@@ -1016,6 +1320,7 @@ If you're still stuck:
 ## 🎉 You Did It!
 
 If you made it this far and everything is working, congratulations! You successfully deployed a full-stack application with:
+
 - ✅ A working database
 - ✅ A backend API server
 - ✅ A frontend web application
@@ -1037,27 +1342,32 @@ After deployment, save these URLs:
 ## Quick Reference: Important Commands
 
 **View backend logs:**
+
 ```bash
 sudo journalctl -u managepetro-backend -f
 ```
 
 **Restart backend:**
+
 ```bash
 sudo systemctl restart managepetro-backend
 ```
 
 **Restart nginx:**
+
 ```bash
 sudo systemctl restart nginx
 ```
 
 **Rebuild frontend after changes:**
+
 ```bash
 cd /path/to/your/frontend
 npm run build
 ```
 
 **Check if services are running:**
+
 ```bash
 sudo systemctl status managepetro-backend
 sudo systemctl status nginx
@@ -1070,6 +1380,7 @@ sudo systemctl status nginx
 When you need to update the code:
 
 **Backend:**
+
 ```bash
 cd /path/to/your/backend
 git pull  # If using git
@@ -1079,6 +1390,7 @@ sudo systemctl restart managepetro-backend
 ```
 
 **Frontend:**
+
 ```bash
 cd /path/to/your/frontend
 git pull  # If using git
