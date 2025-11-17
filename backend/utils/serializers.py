@@ -64,6 +64,7 @@ def station_available_dict(station: Any) -> Dict[str, Any]:
     """A slightly different station shape used in dispatch responses."""
     return {
         "station_id": format_station_id(getattr(station, "id", 0)),
+        "code": getattr(station, "code", None),
         "name": getattr(station, "name", None),
         "city": getattr(station, "city", None),
         "region": getattr(station, "region", None),

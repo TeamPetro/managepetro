@@ -73,10 +73,10 @@ class StationData:
     lat: float
     lon: float
     fuel_type: str
-    capacity_liters: int
-    current_level_liters: int
+    capacity_liters: float
+    current_level_liters: float
     request_method: Optional[str] = REQUEST_METHOD_MANUAL
-    low_fuel_threshold: Optional[int] = DEFAULT_LOW_FUEL_THRESHOLD
+    low_fuel_threshold: Optional[float] = DEFAULT_LOW_FUEL_THRESHOLD
 
     @property
     def availability(self) -> str:
@@ -158,7 +158,7 @@ class DeliveryData:
     """Standardized delivery data"""
 
     id: int
-    volume_liters: int
+    volume_liters: float
     delivery_date: datetime
     status: str
     station_name: str
@@ -191,8 +191,8 @@ class TruckData:
     id: int
     code: str
     plate: str
-    capacity_liters: int  # Cargo capacity (fuel to deliver)
-    fuel_level_percent: int  # Cargo fuel level
+    capacity_liters: float  # Cargo capacity (fuel to deliver) - DECIMAL(12,2) in DB
+    fuel_level_percent: int  # Cargo fuel level - TINYINT in DB (0-100)
     fuel_type: str
     status: str
     compartments: Optional[List[Dict[str, Any]]] = None
@@ -230,6 +230,8 @@ class TruckData:
     @property
     def cargo_fuel_liters(self) -> int:
         """Calculate current cargo fuel in liters"""
+        if not self.capacity_liters or not self.fuel_level_percent:
+            return 0
         return int((self.capacity_liters * self.fuel_level_percent) / 100)
 
     @property
