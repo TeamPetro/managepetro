@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from models.data_models import WeatherData
 from models.database_models import WeatherData as WeatherRecord
 from config import config
+import os
 
 
 async def fetch_weather() -> WeatherData:
@@ -57,8 +58,18 @@ def create_async_db_session():
     Returns an async_sessionmaker bound to an async engine. This function is
     synchronous (it does not perform IO).
     """
-    db_config = config.get_db_config()
-    database_url = f"mysql+aiomysql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
+
+    database_url = os.getenv("DATABASE_URL")
+
+    if not database_url:
+        raise ValueError(
+            "DATABASE_URL environment variable is required. "
+            "Set it to your PostgreSQL connection string."
+        )
+
+    # Convert Render's postgres:// to postgresql+asyncpg://
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
 
     engine = create_async_engine(
         database_url,

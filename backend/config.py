@@ -38,7 +38,7 @@ class Config:
     DB_NAME: str
     DB_USER: str
     DB_PASS: str
-    
+
     # Database Connection Pooling (optional with defaults)
     DB_POOL_SIZE: int
     DB_MAX_OVERFLOW: int
@@ -79,13 +79,13 @@ class Config:
         )
         if not self.GEMINI_API_KEY:
             missing_vars.append("GEMINI_API_KEY (or gemenikey)")
-        
+
         # OpenAI (optional)
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-        
+
         # Anthropic (optional)
         self.ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
-        
+
         # Groq (optional - free tier available)
         self.GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 
@@ -116,29 +116,33 @@ class Config:
         self.DB_PASS = os.getenv("DB_PASS", "").strip()
         if not self.DB_PASS:
             missing_vars.append("DB_PASS")
-        
+
         # Database Connection Pooling (Optional with smart defaults)
         # Use environment-specific defaults: smaller pools for dev, larger for production
         is_production = bool(os.getenv("DATABASE_URL"))
-        
+
         # Pool size: number of connections maintained in the pool
         default_pool_size = 20 if is_production else 5
         try:
-            self.DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", str(default_pool_size)).strip())
+            self.DB_POOL_SIZE = int(
+                os.getenv("DB_POOL_SIZE", str(default_pool_size)).strip()
+            )
         except ValueError:
             raise ConfigurationError(
                 f"DB_POOL_SIZE must be a valid integer, got: {os.getenv('DB_POOL_SIZE')}"
             )
-        
+
         # Max overflow: additional connections beyond pool_size
         default_max_overflow = 30 if is_production else 10
         try:
-            self.DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", str(default_max_overflow)).strip())
+            self.DB_MAX_OVERFLOW = int(
+                os.getenv("DB_MAX_OVERFLOW", str(default_max_overflow)).strip()
+            )
         except ValueError:
             raise ConfigurationError(
                 f"DB_MAX_OVERFLOW must be a valid integer, got: {os.getenv('DB_MAX_OVERFLOW')}"
             )
-        
+
         # Pool recycle: recycle connections older than this (in seconds)
         try:
             self.DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "3600").strip())
@@ -146,11 +150,11 @@ class Config:
             raise ConfigurationError(
                 f"DB_POOL_RECYCLE must be a valid integer, got: {os.getenv('DB_POOL_RECYCLE')}"
             )
-        
+
         # Pool pre-ping: test connections before using them
         pre_ping_str = os.getenv("DB_POOL_PRE_PING", "True").strip().lower()
         self.DB_POOL_PRE_PING = pre_ping_str in ("true", "1", "yes", "on")
-        
+
         # Pool timeout: how long to wait for a connection
         try:
             self.DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30").strip())
@@ -180,15 +184,21 @@ class Config:
         # Logging level for the application
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
         # Default LLM model
-        self.DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "gemini-2.5-flash").strip()
-        
+        self.DEFAULT_LLM_MODEL = os.getenv(
+            "DEFAULT_LLM_MODEL", "gemini-2.5-flash"
+        ).strip()
+
         # CORS Configuration
         # Support comma-separated list of allowed origins from environment
         # Falls back to localhost-only for local development if not specified
         cors_origins_env = os.getenv("CORS_ORIGINS", "").strip()
         if cors_origins_env:
             # Split by comma and strip whitespace from each origin
-            self.CORS_ORIGINS = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+            self.CORS_ORIGINS = [
+                origin.strip()
+                for origin in cors_origins_env.split(",")
+                if origin.strip()
+            ]
         else:
             # Default CORS origins: localhost only for local development
             # Production deployments MUST set CORS_ORIGINS environment variable explicitly
@@ -199,7 +209,7 @@ class Config:
                 "http://127.0.0.1:3001",
                 "http://localhost:5173",  # Vite dev server
             ]
-        
+
         # CORS Origin Regex Pattern (optional)
         # Supports regex patterns for dynamic URLs (e.g., Vercel preview deployments)
         # Example: r"https://.*\.vercel\.app" to allow all Vercel preview URLs
@@ -232,7 +242,10 @@ class Config:
 
     def get_db_config(self) -> dict:
         """
-        Get database configuration as a dictionary suitable for mysql.connector.
+        Get database configuration as a dictionary (legacy method).
+
+        Note: For production (Render), use DATABASE_URL environment variable instead.
+        This method is kept for backward compatibility with local development.
 
         Returns:
             dict: Database configuration dictionary

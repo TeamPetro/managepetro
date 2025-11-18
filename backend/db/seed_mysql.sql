@@ -1,10 +1,26 @@
--- PostgreSQL-compatible seed data for ManagePetro
--- (USE command is skipped by init_production_db.py)
+USE manage_petro;
 
 -- Clear existing data (safe re-seeding)
-TRUNCATE TABLE driver_shifts, weather_data, station_fuel_levels, deliveries, truck_compartments, trucks, drivers, stations, users RESTART IDENTITY CASCADE;
+DELETE FROM driver_shifts WHERE id > 0;
+DELETE FROM weather_data WHERE id > 0;
+DELETE FROM station_fuel_levels WHERE id > 0;
+DELETE FROM deliveries WHERE id > 0;
+DELETE FROM truck_compartments WHERE id > 0;
+DELETE FROM trucks WHERE id > 0;
+DELETE FROM drivers WHERE id > 0;
+DELETE FROM stations WHERE id > 0;
+DELETE FROM users WHERE id > 0;
 
--- Note: TRUNCATE with RESTART IDENTITY automatically resets sequences (PostgreSQL equivalent of AUTO_INCREMENT)
+-- Reset AUTO_INCREMENT counters
+ALTER TABLE driver_shifts AUTO_INCREMENT = 1;
+ALTER TABLE weather_data AUTO_INCREMENT = 1;
+ALTER TABLE station_fuel_levels AUTO_INCREMENT = 1;
+ALTER TABLE deliveries AUTO_INCREMENT = 1;
+ALTER TABLE truck_compartments AUTO_INCREMENT = 1;
+ALTER TABLE trucks AUTO_INCREMENT = 1;
+ALTER TABLE drivers AUTO_INCREMENT = 1;
+ALTER TABLE stations AUTO_INCREMENT = 1;
+ALTER TABLE users AUTO_INCREMENT = 1;
 
 -- =====================
 -- Drivers (~25 professional fuel truck drivers)
