@@ -67,7 +67,7 @@ async def lifespan(_app: FastAPI):
         f"Environment: {'Production' if os.getenv('DATABASE_URL') else 'Development'}"
     )
     _logger.info(
-        f"Database: {'PostgreSQL (Render)' if os.getenv('DATABASE_URL') else 'MySQL (Local)'}"
+        f"Database: PostgreSQL ({'Render' if os.getenv('DATABASE_URL') else 'Local'})"
     )
     _logger.info(f"CORS Origins: {len(config.CORS_ORIGINS)} configured")
 
@@ -893,11 +893,12 @@ async def execute_dispatch(
                 shift_stmt = select(
                     func.coalesce(
                         func.sum(
-                            func.timestampdiff(
-                                text("HOUR"),
-                                DriverShiftORM.shift_start,
-                                func.coalesce(DriverShiftORM.shift_end, func.now()),
+                            func.extract(
+                                "epoch",
+                                func.coalesce(DriverShiftORM.shift_end, func.now())
+                                - DriverShiftORM.shift_start,
                             )
+                            / 3600
                         ),
                         0,
                     )

@@ -3,7 +3,12 @@ from sqlalchemy import select, and_, or_, func, text
 from sqlalchemy.exc import SQLAlchemyError
 from .prompt_service import PromptService
 from .api_utils import get_weather_async
-from models.database_models import Station, Truck, Delivery, DriverShift as DriverShiftORM
+from models.database_models import (
+    Station,
+    Truck,
+    Delivery,
+    DriverShift as DriverShiftORM,
+)
 from models.data_models import (
     StationData,
     DeliveryData,
@@ -489,7 +494,9 @@ class LLMService:
             trucks = []
             for truck in trucks_orm:
                 # Get compartments and current driver using SQLAlchemy relationships
-                await session.refresh(truck, attribute_names=["compartments", "current_driver"])
+                await session.refresh(
+                    truck, attribute_names=["compartments", "current_driver"]
+                )
 
                 compartments = []
                 for comp in truck.compartments:
@@ -506,26 +513,29 @@ class LLMService:
                 driver_name = None
                 driver_status = None
                 driver_hours_remaining = None
-                
+
                 if truck.current_driver:
                     driver = truck.current_driver
                     driver_name = f"{driver.first_name} {driver.last_name}"
                     driver_status = driver.status
-                    
+
                     # Calculate hours remaining for driver today
                     if driver.max_hours_per_shift:
                         today_start = datetime.now(timezone.utc).replace(
                             hour=0, minute=0, second=0, microsecond=0
                         )
-                        
+
                         shift_stmt = select(
                             func.coalesce(
                                 func.sum(
-                                    func.timestampdiff(
-                                        text("HOUR"),
-                                        DriverShiftORM.shift_start,
-                                        func.coalesce(DriverShiftORM.shift_end, func.now()),
+                                    func.extract(
+                                        "epoch",
+                                        func.coalesce(
+                                            DriverShiftORM.shift_end, func.now()
+                                        )
+                                        - DriverShiftORM.shift_start,
                                     )
+                                    / 3600
                                 ),
                                 0,
                             )
@@ -555,9 +565,21 @@ class LLMService:
                     driver_name=driver_name,
                     driver_status=driver_status,
                     driver_hours_remaining=driver_hours_remaining,
-                    current_location=truck.current_location if hasattr(truck, 'current_location') else None,
-                    last_maintenance_date=truck.last_maintenance_date if hasattr(truck, 'last_maintenance_date') else None,
-                    next_maintenance_date=truck.next_maintenance_date if hasattr(truck, 'next_maintenance_date') else None,
+                    current_location=(
+                        truck.current_location
+                        if hasattr(truck, "current_location")
+                        else None
+                    ),
+                    last_maintenance_date=(
+                        truck.last_maintenance_date
+                        if hasattr(truck, "last_maintenance_date")
+                        else None
+                    ),
+                    next_maintenance_date=(
+                        truck.next_maintenance_date
+                        if hasattr(truck, "next_maintenance_date")
+                        else None
+                    ),
                 )
                 trucks.append(truck_data)
 
@@ -613,7 +635,9 @@ class LLMService:
                 "Found truck: ID=%s, code=%s", truck_orm.id, truck_orm.code
             )
             # Get compartments and current driver using SQLAlchemy relationship
-            await session.refresh(truck_orm, attribute_names=["compartments", "current_driver"])
+            await session.refresh(
+                truck_orm, attribute_names=["compartments", "current_driver"]
+            )
 
             compartments = []
             for comp in truck_orm.compartments:
@@ -630,26 +654,27 @@ class LLMService:
             driver_name = None
             driver_status = None
             driver_hours_remaining = None
-            
+
             if truck_orm.current_driver:
                 driver = truck_orm.current_driver
                 driver_name = f"{driver.first_name} {driver.last_name}"
                 driver_status = driver.status
-                
+
                 # Calculate hours remaining for driver today
                 if driver.max_hours_per_shift:
                     today_start = datetime.now(timezone.utc).replace(
                         hour=0, minute=0, second=0, microsecond=0
                     )
-                    
+
                     shift_stmt = select(
                         func.coalesce(
                             func.sum(
-                                func.timestampdiff(
-                                    text("HOUR"),
-                                    DriverShiftORM.shift_start,
-                                    func.coalesce(DriverShiftORM.shift_end, func.now()),
+                                func.extract(
+                                    "epoch",
+                                    func.coalesce(DriverShiftORM.shift_end, func.now())
+                                    - DriverShiftORM.shift_start,
                                 )
+                                / 3600
                             ),
                             0,
                         )
@@ -1218,10 +1243,12 @@ class LLMService:
                                 "step_number": step_number,
                                 "station": station_info,
                             }
-                            
+
                             # Extract station code from station_info (e.g., "Station Name (STN-001)")
                             # Look for pattern (CODE) at the end
-                            code_match = re.search(r'\(([A-Z0-9-]+)\)\s*$', station_info)
+                            code_match = re.search(
+                                r"\(([A-Z0-9-]+)\)\s*$", station_info
+                            )
                             if code_match:
                                 current_stop["station_code"] = code_match.group(1)
                             else:
@@ -1359,33 +1386,37 @@ class LLMService:
                         # Enrich recommendation with truck data from database
                         truck_code = rec["truck_code"]
                         matched_truck = trucks_by_code.get(truck_code)
-                        
+
                         if matched_truck:
                             # Add truck details to recommendation
                             rec["truck_plate"] = matched_truck.plate
                             rec["truck_capacity_liters"] = matched_truck.capacity_liters
-                            rec["truck_fuel_level_percent"] = matched_truck.fuel_level_percent
+                            rec["truck_fuel_level_percent"] = (
+                                matched_truck.fuel_level_percent
+                            )
                             rec["truck_fuel_type"] = matched_truck.fuel_type
                             rec["truck_status"] = matched_truck.status
-                            
+
                             # Add driver information if available
                             if matched_truck.driver_name:
                                 rec["driver_name"] = matched_truck.driver_name
                                 rec["driver_status"] = matched_truck.driver_status
-                                rec["driver_hours_remaining"] = matched_truck.driver_hours_remaining
-                            
+                                rec["driver_hours_remaining"] = (
+                                    matched_truck.driver_hours_remaining
+                                )
+
                             # Add calculated fields
                             rec["cargo_fuel_liters"] = matched_truck.cargo_fuel_liters
                             rec["max_range_km"] = matched_truck.max_range_km
-                        
+
                         # Rename total_fuel to total_fuel_delivery for clarity
                         if "total_fuel" in rec:
                             rec["total_fuel_delivery"] = rec.pop("total_fuel")
-                        
+
                         # Add route_summary from route field if present
                         if "route" in rec:
                             rec["route_summary"] = rec["route"]
-                        
+
                         recommendations.append(rec)
 
             # Extract efficiency analysis

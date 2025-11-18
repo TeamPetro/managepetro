@@ -49,14 +49,9 @@ class DatabaseManager:
                 f"Database host: {database_url.split('@')[1].split('/')[0] if '@' in database_url else 'unknown'}"
             )
         else:
-            logger.info("DATABASE_URL not found, using local MySQL")
-            # Fallback to local MySQL (your dev setup)
-            database_url = (
-                f"mysql+aiomysql://{config.DB_USER}:{config.DB_PASS}"
-                f"@{config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}"
-            )
-            logger.info(
-                f"MySQL connection: {config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}"
+            logger.error("DATABASE_URL environment variable is required")
+            raise ValueError(
+                "DATABASE_URL must be set. For local development, set it to your PostgreSQL connection string."
             )
 
         # SQLAlchemy 2.0 async engine configuration
