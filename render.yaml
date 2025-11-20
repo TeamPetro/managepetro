@@ -1,8 +1,8 @@
 # Render Blueprint Configuration for ManagePetro Backend
 # This file automates deployment to Render.com
 #
-# NOTE: The primary render.yaml should be in the repository root (../render.yaml)
-#       This is a backup copy for reference. Render reads from the root.
+# IMPORTANT: This file MUST be in the repository root for Render to detect it
+# The rootDir setting below tells Render to run commands from the backend folder
 # Database: External Supabase PostgreSQL (set DATABASE_URL in Render dashboard)
 
 services:
