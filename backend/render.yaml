@@ -38,7 +38,7 @@ services:
       - key: DEFAULT_LLM_MODEL
         value: models/gemini-2.0-flash-exp
       - key: FRONTEND_URL
-        sync: false  # Set this to your frontend URL after deploying frontend
+        value: https://managepetro.vercel.app  # Your Vercel frontend URL
       
   # Frontend Static Site  
   # Note: Frontend is NOT included in this blueprint (only backend/ is deployed)

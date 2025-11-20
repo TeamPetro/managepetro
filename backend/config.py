@@ -89,33 +89,34 @@ class Config:
         # Groq (optional - free tier available)
         self.GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 
-        # Database Configuration (Required)
-        self.DB_HOST = os.getenv("DB_HOST", "").strip()
-        if not self.DB_HOST:
-            missing_vars.append("DB_HOST")
+        # Database Configuration
+        # When DATABASE_URL is set (Supabase/Render), individual DB vars are optional
+        # For local development without DATABASE_URL, they're required
+        has_database_url = bool(os.getenv("DATABASE_URL"))
 
-        db_port_str = os.getenv("DB_PORT", "").strip()
-        if not db_port_str:
-            missing_vars.append("DB_PORT")
-        else:
-            try:
-                self.DB_PORT = int(db_port_str)
-            except ValueError:
-                raise ConfigurationError(
-                    f"DB_PORT must be a valid integer, got: {db_port_str}"
-                )
+        self.DB_HOST = os.getenv("DB_HOST", "localhost").strip()
+        if not has_database_url and not self.DB_HOST:
+            missing_vars.append("DB_HOST (or DATABASE_URL)")
 
-        self.DB_NAME = os.getenv("DB_NAME", "").strip()
-        if not self.DB_NAME:
-            missing_vars.append("DB_NAME")
+        db_port_str = os.getenv("DB_PORT", "5432").strip()
+        try:
+            self.DB_PORT = int(db_port_str)
+        except ValueError:
+            raise ConfigurationError(
+                f"DB_PORT must be a valid integer, got: {db_port_str}"
+            )
 
-        self.DB_USER = os.getenv("DB_USER", "").strip()
-        if not self.DB_USER:
-            missing_vars.append("DB_USER")
+        self.DB_NAME = os.getenv("DB_NAME", "postgres").strip()
+        if not has_database_url and not self.DB_NAME:
+            missing_vars.append("DB_NAME (or DATABASE_URL)")
+
+        self.DB_USER = os.getenv("DB_USER", "postgres").strip()
+        if not has_database_url and not self.DB_USER:
+            missing_vars.append("DB_USER (or DATABASE_URL)")
 
         self.DB_PASS = os.getenv("DB_PASS", "").strip()
-        if not self.DB_PASS:
-            missing_vars.append("DB_PASS")
+        if not has_database_url and not self.DB_PASS:
+            missing_vars.append("DB_PASS (or DATABASE_URL)")
 
         # Database Connection Pooling (Optional with smart defaults)
         # Use environment-specific defaults: smaller pools for dev, larger for production
@@ -192,6 +193,8 @@ class Config:
         # Support comma-separated list of allowed origins from environment
         # Falls back to localhost-only for local development if not specified
         cors_origins_env = os.getenv("CORS_ORIGINS", "").strip()
+        frontend_url = os.getenv("FRONTEND_URL", "").strip()
+
         if cors_origins_env:
             # Split by comma and strip whitespace from each origin
             self.CORS_ORIGINS = [
@@ -201,7 +204,7 @@ class Config:
             ]
         else:
             # Default CORS origins: localhost only for local development
-            # Production deployments MUST set CORS_ORIGINS environment variable explicitly
+            # Production deployments MUST set CORS_ORIGINS or FRONTEND_URL environment variable
             self.CORS_ORIGINS = [
                 "http://localhost:3000",
                 "http://localhost:3001",
@@ -209,6 +212,10 @@ class Config:
                 "http://127.0.0.1:3001",
                 "http://localhost:5173",  # Vite dev server
             ]
+
+        # Add FRONTEND_URL to allowed origins if provided (e.g., Vercel deployment)
+        if frontend_url and frontend_url not in self.CORS_ORIGINS:
+            self.CORS_ORIGINS.append(frontend_url)
 
         # CORS Origin Regex Pattern (optional)
         # Supports regex patterns for dynamic URLs (e.g., Vercel preview deployments)
