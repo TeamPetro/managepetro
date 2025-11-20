@@ -1,9 +1,8 @@
 # Render Blueprint Configuration for ManagePetro Backend
 # This file automates deployment to Render.com
 #
-# IMPORTANT: This file is located in the backend/ folder because 
-# the Render service root directory is set to /backend
-# The frontend must be deployed separately as a Static Site in Render dashboard
+# IMPORTANT: Set Root Directory to "backend" when creating service in Render dashboard
+# Database: External Supabase PostgreSQL (set DATABASE_URL in Render dashboard)
 
 services:
   # Backend API Service
@@ -12,16 +11,17 @@ services:
     runtime: python
     region: oregon
     plan: free
-    # No rootDir needed - render.yaml is already in backend/ folder
     buildCommand: pip install -r requirements.txt
     startCommand: python init_production_db.py && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.12
+      # Set DATABASE_URL to your Supabase connection string in Render dashboard
+      # Get it from: Supabase Dashboard > Project Settings > Database > Connection String
+      # Use Session Mode pooler for persistent servers: postgresql://...@aws-0-[region].pooler.supabase.com:5432/postgres
+      # Or Direct connection if your Render region supports IPv6: postgresql://...@db.[project-ref].supabase.co:5432/postgres
       - key: DATABASE_URL
-        fromDatabase:
-          name: managepetro-db
-          property: connectionString
+        sync: false  # Set this manually in Render dashboard with your Supabase connection string
       # Add your API keys in the Render dashboard - DO NOT commit real keys to git!
       - key: WEATHER_API_KEY
         sync: false  # Set this in Render dashboard
@@ -50,11 +50,5 @@ services:
   #   - Add rewrite rule: /* -> /index.html (for SPA routing)
   #   - Set VITE_API_BASE_URL environment variable to your backend URL
 
-# Database
-databases:
-  - name: managepetro-db
-    databaseName: manage_petro_db
-    user: managepetro_user
-    region: oregon
-    plan: free
-    ipAllowList: []  # Empty means allow all IPs
+# Database: Using external Supabase PostgreSQL
+# No database section needed - configure DATABASE_URL environment variable above
