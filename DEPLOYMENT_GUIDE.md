@@ -219,27 +219,48 @@ After your first deployment to Render:
 1. Go to your Render dashboard
 2. Click on your **backend service**
 3. Click on the **"Logs"** tab
-4. Look for these lines near the start of your deployment:
+4. Look for these lines in the Pre-Deploy section (before server starts):
+
+**Successful initialization will show:**
+
+```
+🚀 MANAGEPETRO DATABASE INITIALIZATION - STARTING
+================================================================================
+✅ Database connection successful!
+📊 Tables found in database: X
+📊 Database has data: True/False
+```
 
 **If tables needed to be created:**
 
 ```
-Tables do not exist. Running schema.sql...
-Schema initialization completed successfully!
+🏗️  CREATING DATABASE SCHEMA
+================================================================================
+✅ Schema creation completed
+✅ Schema creation completed: X successful, Y skipped, Z failed
 ```
 
 **If data needed to be seeded:**
 
 ```
-No data found in database. Running seed.sql...
-Database seeding completed successfully!
+🌱 SEEDING DATABASE WITH INITIAL DATA
+================================================================================
+✅ Database seeding completed: X successful, Y skipped, Z failed
+✅ Data verification successful - database properly seeded
 ```
 
 **If everything is already set up:**
 
 ```
-Tables already exist. Skipping schema initialization.
-Data already exists in database. Skipping seeding.
+✓ Tables already exist in database. Skipping schema creation.
+✓ Data already exists in database. Skipping seeding.
+```
+
+**Successful completion:**
+
+```
+✅ DATABASE INITIALIZATION COMPLETE (took X.XXs)
+================================================================================
 ```
 
 #### Troubleshooting: "My Production Database is Empty!"
@@ -254,21 +275,37 @@ If you deployed but don't see any seeded data:
 
 **Step 2: Common issues and fixes**
 
-**Problem:** Logs say "ERROR: Could not connect to database"
+**Problem:** Logs say "❌ DATABASE_URL environment variable is not set!"
 
-- **Solution:** Check that your Render database is running (Render dashboard → Databases)
-- Make sure the `DATABASE_URL` environment variable is connected to your backend service
+- **Solution:** Set the `DATABASE_URL` environment variable in your Render dashboard
+- Go to: Service → Environment → Add Environment Variable
+- Use your Supabase connection string (Session Mode pooler recommended)
 
-**Problem:** Logs say "ERROR: relation already exists"
+**Problem:** Logs say "❌ Database connection failed"
 
-- **Solution:** This is fine! It means tables were already created. Check if data exists.
+- **Solution:** Check that your database is running and accessible
+- Verify the DATABASE_URL is correct (copy from Supabase dashboard)
+- If using Supabase, try both Session Mode and Direct connection strings
+- Check if your Render region can access your database
+
+**Problem:** Logs say "ERROR: relation already exists" or "already exists"
+
+- **Solution:** This is fine! It means tables were already created. The script handles this gracefully.
+- Check if data exists by looking for the seeding section in logs
 
 **Problem:** No logs about database initialization at all
 
 - **Solution:** The `render.yaml` file might not be set up correctly. Check that:
-  1. `render.yaml` exists in your repository root
+  1. Your repository has `backend/render.yaml` file (not in root)
   2. You deployed using "New → Blueprint" (not "New → Web Service")
   3. The backend service has `preDeployCommand: python init_production_db.py`
+  4. Look in the "Pre-Deploy" section of logs (not regular logs)
+
+**Problem:** Schema created but no data after seeding
+
+- **Solution:** This may indicate the seed.sql file has syntax errors or incompatibilities
+- Check the logs for specific SQL errors during seeding
+- Verify the seed.sql file is PostgreSQL-compatible (not MySQL)
 
 **Step 3: Manual fix - Re-seed the database**
 
