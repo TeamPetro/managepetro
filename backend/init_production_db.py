@@ -21,7 +21,7 @@ database_url = os.getenv("DATABASE_URL")
 if not database_url:
     raise ValueError("DATABASE_URL environment variable is required")
 
-# Convert Render's postgres:// to postgresql+asyncpg:// for async SQLAlchemy
+# Convert Render/Supabase postgres:// or postgresql:// to postgresql+asyncpg:// for async SQLAlchemy
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
 elif database_url.startswith("postgresql://") and "asyncpg" not in database_url:
