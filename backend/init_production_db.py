@@ -190,6 +190,10 @@ async def init_db():
             logger.error("Please verify your DATABASE_URL is correct and the database is accessible.")
             raise
 
+        # Check for force seed flag
+        force_seed = os.getenv("FORCE_DB_SEED", "false").lower() in ("true", "1", "yes")
+        logger.info(f"\n⚙️  Configuration: FORCE_DB_SEED = {force_seed}")
+
         # Check if tables exist
         logger.info("\n📋 Checking existing database state...")
         tables_exist = await check_tables_exist()
@@ -221,11 +225,18 @@ async def init_db():
         else:
             logger.info("\n✓ Tables already exist in database. Skipping schema creation.")
 
-        # Run seed if data doesn't exist
-        if not data_exists:
+        # Determine if we should seed
+        should_seed = force_seed or not data_exists
+        
+        if should_seed:
             logger.info("\n" + "=" * 80)
-            logger.info("🌱 SEEDING DATABASE WITH INITIAL DATA")
+            if force_seed:
+                logger.info("🌱 FORCE SEEDING DATABASE (FORCE_DB_SEED=true)")
+                logger.info("   This will TRUNCATE all data and re-seed from scratch")
+            else:
+                logger.info("🌱 SEEDING DATABASE WITH INITIAL DATA")
             logger.info("=" * 80)
+            
             await run_sql_file(seed_file, "seed.sql")
             logger.info("✅ Database seeding completed")
             
@@ -239,6 +250,7 @@ async def init_db():
                 logger.info("✅ Data verification successful - database properly seeded")
         else:
             logger.info("\n✓ Data already exists in database. Skipping seeding.")
+            logger.info("   To force re-seed, set environment variable: FORCE_DB_SEED=true")
 
         elapsed = asyncio.get_event_loop().time() - start_time
         logger.info("\n" + "=" * 80)
