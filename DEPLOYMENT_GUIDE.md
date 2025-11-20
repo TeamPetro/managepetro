@@ -352,17 +352,29 @@ The `init_production_db.py` script is located in your `backend/` folder. Here's 
 └────────────┬────────────────────────┘
              │
              ▼
+      ┌──────────────────┐
+      │ Check env var    │
+      │ FORCE_DB_SEED    │
+      └────────┬─────────┘
+               │
+               ▼
       ┌──────────────┐
       │ Do tables    │ NO  ┌──────────────────────┐
       │ exist?       ├────►│ Run schema.sql       │
       └──────┬───────┘     │ (Create tables)      │
              │ YES         └──────────────────────┘
              ▼
+      ┌─────────────────────┐
+      │ FORCE_DB_SEED=true  │ YES ┌───────────────────────┐
+      │ OR no data exists?  ├────►│ Run seed.sql          │
+      └──────┬──────────────┘     │ (TRUNCATE + re-seed)  │
+             │ NO                  └───────────────────────┘
+             ▼
       ┌──────────────┐
-      │ Does data    │ NO  ┌──────────────────────┐
-      │ exist?       ├────►│ Run seed.sql         │
-      └──────┬───────┘     │ (Add demo data)      │
-             │ YES         └──────────────────────┘
+      │ Skip seeding │
+      │ (data exists)│
+      └──────┬───────┘
+             │
              ▼
 ┌─────────────────────────────────────┐
 │    Backend server starts normally    │
@@ -375,6 +387,31 @@ The `init_production_db.py` script is located in your `backend/` folder. Here's 
 - ✅ Runs automatically before every deployment
 - ✅ Handles PostgreSQL/MySQL differences automatically
 - ✅ Logs everything so you can see what happened
+
+#### Force Re-Seeding on Every Deployment
+
+**NEW FEATURE:** You can now configure the database to be completely wiped and re-seeded on every deployment.
+
+This is useful when:
+- You want to ensure fresh demo data on every deployment
+- You're frequently updating the seed data
+- You want to start from a clean slate every time
+- Automatic seeding has previously failed and you want to guarantee it runs
+
+To enable force re-seeding:
+
+1. In your Render dashboard, go to your backend service
+2. Click **"Environment"** tab
+3. Add a new environment variable:
+   - **Key:** `FORCE_DB_SEED`
+   - **Value:** `true`
+4. Save changes and trigger a new deployment
+
+⚠️ **WARNING:** With `FORCE_DB_SEED=true`, **ALL DATA** in your database will be erased and re-created from the seed file on every deployment. Do not use this in production if you have real user data!
+
+**Recommended settings:**
+- `FORCE_DB_SEED=true` - For demo/staging environments (always fresh data)
+- `FORCE_DB_SEED=false` or unset - For production (preserves user data)
 
 #### When to Re-Seed Manually
 

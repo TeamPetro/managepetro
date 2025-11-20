@@ -7,6 +7,15 @@ TRUNCATE TABLE driver_shifts, weather_data, station_fuel_levels, deliveries, tru
 -- Note: TRUNCATE with RESTART IDENTITY automatically resets sequences (PostgreSQL equivalent of AUTO_INCREMENT)
 
 -- =====================
+-- Demo Users (for authentication)
+-- =====================
+-- Password for all demo users: "demo123"
+-- Hash generated with: pwdlib PasswordHash using argon2
+INSERT INTO users (username, email, hashed_password, is_active) VALUES
+('demo', 'demo@managepetro.com', '$argon2id$v=19$m=65536,t=3,p=4$8B5DyDmnNAaAMIawVqqV0g$VjgNert3l1JlXH5AmC6f0vOGJmxLlAqSLV2gPBnGOGs', TRUE),
+('admin', 'admin@managepetro.com', '$argon2id$v=19$m=65536,t=3,p=4$8B5DyDmnNAaAMIawVqqV0g$VjgNert3l1JlXH5AmC6f0vOGJmxLlAqSLV2gPBnGOGs', TRUE);
+
+-- =====================
 -- Drivers (~25 professional fuel truck drivers)
 -- =====================
 INSERT INTO drivers (employee_id, first_name, last_name, phone, email, license_number, license_class, license_expiry_date, hazmat_certified, hazmat_expiry_date, tanker_endorsement, years_experience, status, max_hours_per_shift, current_location, home_terminal, hourly_rate, certifications, hired_date, last_medical_exam, next_medical_exam) VALUES

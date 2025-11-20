@@ -135,6 +135,7 @@ async def run_sql_file(file_path: Path, description: str):
     successful = 0
     skipped = 0
     failed = 0
+    critical_errors = []
 
     async with engine.begin() as conn:
         for i, statement in enumerate(statements, 1):
@@ -160,14 +161,34 @@ async def run_sql_file(file_path: Path, description: str):
                     logger.info(f"  ✓ Progress: {i}/{len(statements)} statements processed")
             except Exception as e:
                 failed += 1
-                error_msg = str(e)[:200]
-                # Only log as warning if it's a "relation already exists" error (expected on re-runs)
+                error_msg = str(e)
+                # Only log as debug if it's a "relation already exists" error (expected on re-runs)
                 if "already exists" in error_msg.lower():
-                    logger.debug(f"  ⊘ Statement {i}: {error_msg}")
+                    logger.debug(f"  ⊘ Statement {i}: {error_msg[:200]}")
                 else:
-                    logger.warning(f"  ⚠️ Statement {i} failed: {error_msg}")
+                    # Log full error for non-trivial failures
+                    logger.error(f"  ❌ Statement {i} FAILED:")
+                    logger.error(f"     Error: {error_msg[:500]}")
+                    # Show a snippet of the failed statement
+                    stmt_preview = statement[:200] + "..." if len(statement) > 200 else statement
+                    logger.error(f"     Statement: {stmt_preview}")
+                    critical_errors.append((i, error_msg[:500], stmt_preview))
 
     logger.info(f"✅ {description} completed: {successful} successful, {skipped} skipped, {failed} failed")
+    
+    # If critical errors occurred, raise an exception with details
+    if critical_errors and "seed" in description.lower():
+        logger.error("\n" + "=" * 80)
+        logger.error(f"❌ CRITICAL: {len(critical_errors)} statement(s) failed during seeding!")
+        logger.error("=" * 80)
+        for stmt_num, err, stmt in critical_errors[:3]:  # Show first 3 errors
+            logger.error(f"\nStatement #{stmt_num}:")
+            logger.error(f"  Error: {err}")
+            logger.error(f"  SQL: {stmt}")
+        if len(critical_errors) > 3:
+            logger.error(f"\n... and {len(critical_errors) - 3} more errors")
+        logger.error("=" * 80)
+        raise RuntimeError(f"Seeding failed with {len(critical_errors)} errors. See logs above for details.")
 
 
 async def init_db():
@@ -189,6 +210,10 @@ async def init_db():
             logger.error(f"❌ Database connection failed: {conn_error}")
             logger.error("Please verify your DATABASE_URL is correct and the database is accessible.")
             raise
+
+        # Check for force seed flag
+        force_seed = os.getenv("FORCE_DB_SEED", "false").lower() in ("true", "1", "yes")
+        logger.info(f"\n⚙️  Configuration: FORCE_DB_SEED = {force_seed}")
 
         # Check if tables exist
         logger.info("\n📋 Checking existing database state...")
@@ -221,11 +246,18 @@ async def init_db():
         else:
             logger.info("\n✓ Tables already exist in database. Skipping schema creation.")
 
-        # Run seed if data doesn't exist
-        if not data_exists:
+        # Determine if we should seed
+        should_seed = force_seed or not data_exists
+        
+        if should_seed:
             logger.info("\n" + "=" * 80)
-            logger.info("🌱 SEEDING DATABASE WITH INITIAL DATA")
+            if force_seed:
+                logger.info("🌱 FORCE SEEDING DATABASE (FORCE_DB_SEED=true)")
+                logger.info("   This will TRUNCATE all data and re-seed from scratch")
+            else:
+                logger.info("🌱 SEEDING DATABASE WITH INITIAL DATA")
             logger.info("=" * 80)
+            
             await run_sql_file(seed_file, "seed.sql")
             logger.info("✅ Database seeding completed")
             
@@ -239,6 +271,7 @@ async def init_db():
                 logger.info("✅ Data verification successful - database properly seeded")
         else:
             logger.info("\n✓ Data already exists in database. Skipping seeding.")
+            logger.info("   To force re-seed, set environment variable: FORCE_DB_SEED=true")
 
         elapsed = asyncio.get_event_loop().time() - start_time
         logger.info("\n" + "=" * 80)
