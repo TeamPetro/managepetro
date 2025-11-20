@@ -295,12 +295,11 @@ If you deployed but don't see any seeded data:
 
 **Problem:** No logs about database initialization at all
 
-- **Solution:** The `render.yaml` file might not be set up correctly. Check that:
-  1. Your repository has `render.yaml` file **in the repository root** (not in backend/)
-  2. You deployed using "New → Blueprint" (not "New → Web Service")
-  3. The render.yaml has `rootDir: ./backend` to run commands from backend folder
-  4. The backend service has `preDeployCommand: python init_production_db.py`
-  5. Look in the "Pre-Deploy" section of logs (not regular logs)
+- **Solution:** The service might not be configured correctly. Check that:
+  1. In Render dashboard, your service has Root Directory set to `backend`
+  2. Build & Deploy settings show: Pre-Deploy Command: `python init_production_db.py`
+  3. Build & Deploy settings show: Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+  4. Look in the "Pre-Deploy" section of logs (not regular application logs)
 
 **Problem:** Schema created but no data after seeding
 

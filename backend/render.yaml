@@ -1,8 +1,8 @@
-# Render Blueprint Configuration for ManagePetro Backend
-# This file automates deployment to Render.com
+# Render Configuration for ManagePetro Backend
+# This file can be used as reference when manually configuring your Render service
 #
-# NOTE: The primary render.yaml should be in the repository root (../render.yaml)
-#       This is a backup copy for reference. Render reads from the root.
+# IMPORTANT: When creating the service in Render dashboard, set Root Directory to "backend"
+# This ensures all commands run from the backend folder where requirements.txt and init_production_db.py are located
 # Database: External Supabase PostgreSQL (set DATABASE_URL in Render dashboard)
 
 services:
@@ -12,7 +12,6 @@ services:
     runtime: python
     region: oregon
     plan: free
-    rootDir: ./backend
     buildCommand: pip install -r requirements.txt
     preDeployCommand: python init_production_db.py
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
