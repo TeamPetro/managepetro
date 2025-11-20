@@ -33,18 +33,25 @@ class DatabaseManager:
         database_url = os.getenv("DATABASE_URL")
 
         if database_url:
-            logger.info("DATABASE_URL found, using PostgreSQL on Render")
-            # Use Render's managed Postgres database
-            # Render URLs look like: postgres://user:pass@host:5432/dbname
-            # SQLAlchemy async driver for Postgres uses "postgresql+asyncpg://"
+            logger.info("DATABASE_URL found, using PostgreSQL")
+            # Convert to SQLAlchemy async driver format
+            # Render/Supabase URLs: postgres:// or postgresql://
+            # SQLAlchemy async requires: postgresql+asyncpg://
             if database_url.startswith("postgres://"):
-                original_url = database_url
                 database_url = database_url.replace(
                     "postgres://", "postgresql+asyncpg://", 1
                 )
-                logger.info(
-                    f"Converted database URL from postgres:// to postgresql+asyncpg://"
+                logger.info("Converted postgres:// to postgresql+asyncpg://")
+            elif database_url.startswith("postgresql://"):
+                database_url = database_url.replace(
+                    "postgresql://", "postgresql+asyncpg://", 1
                 )
+                logger.info("Converted postgresql:// to postgresql+asyncpg://")
+            elif not database_url.startswith("postgresql+asyncpg://"):
+                logger.warning(
+                    f"Unexpected DATABASE_URL format: {database_url[:20]}..."
+                )
+
             logger.info(
                 f"Database host: {database_url.split('@')[1].split('/')[0] if '@' in database_url else 'unknown'}"
             )
