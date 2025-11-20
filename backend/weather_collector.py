@@ -67,9 +67,11 @@ def create_async_db_session():
             "Set it to your PostgreSQL connection string."
         )
 
-    # Convert Render's postgres:// to postgresql+asyncpg://
+    # Convert Render/Supabase postgres:// or postgresql:// to postgresql+asyncpg://
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
     engine = create_async_engine(
         database_url,
