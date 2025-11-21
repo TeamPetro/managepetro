@@ -1,10 +1,28 @@
--- PostgreSQL-compatible seed data for ManagePetro
--- (USE command is skipped by init_production_db.py)
+-- ManagePetro seed data for Supabase PostgreSQL
+-- Run as a SQL script (e.g., in Supabase SQL editor or migration)
+-- Assumes all tables are in the "public" schema.
 
+BEGIN;
+
+SET search_path TO public;
+
+-- =====================
 -- Clear existing data (safe re-seeding)
-TRUNCATE TABLE driver_shifts, weather_data, station_fuel_levels, deliveries, truck_compartments, trucks, drivers, stations, users RESTART IDENTITY CASCADE;
+-- =====================
+TRUNCATE TABLE
+  driver_shifts,
+  weather_data,
+  station_fuel_levels,
+  deliveries,
+  truck_compartments,
+  trucks,
+  drivers,
+  stations,
+  users
+RESTART IDENTITY CASCADE;
 
--- Note: TRUNCATE with RESTART IDENTITY automatically resets sequences (PostgreSQL equivalent of AUTO_INCREMENT)
+-- Note: TRUNCATE with RESTART IDENTITY automatically resets sequences
+-- (PostgreSQL equivalent of AUTO_INCREMENT)
 
 -- =====================
 -- Demo Users (for authentication)
@@ -18,7 +36,29 @@ INSERT INTO users (username, email, hashed_password, is_active) VALUES
 -- =====================
 -- Drivers (~25 professional fuel truck drivers)
 -- =====================
-INSERT INTO drivers (employee_id, first_name, last_name, phone, email, license_number, license_class, license_expiry_date, hazmat_certified, hazmat_expiry_date, tanker_endorsement, years_experience, status, max_hours_per_shift, current_location, home_terminal, hourly_rate, certifications, hired_date, last_medical_exam, next_medical_exam) VALUES
+INSERT INTO drivers (
+  employee_id,
+  first_name,
+  last_name,
+  phone,
+  email,
+  license_number,
+  license_class,
+  license_expiry_date,
+  hazmat_certified,
+  hazmat_expiry_date,
+  tanker_endorsement,
+  years_experience,
+  status,
+  max_hours_per_shift,
+  current_location,
+  home_terminal,
+  hourly_rate,
+  certifications,
+  hired_date,
+  last_medical_exam,
+  next_medical_exam
+) VALUES
 -- Toronto Drivers
 ('DRV001','John','Martinez','416-555-0101','john.martinez@managepetro.com','ON-CDL-10234','A','2026-06-15',TRUE,'2026-03-20',TRUE,12,'active',11.00,'Toronto, ON','Toronto',35.50,'Class A CDL, HazMat, Tanker, FAST Card','2015-03-10','2024-08-15','2026-08-15'),
 ('DRV002','Sarah','Chen','416-555-0102','sarah.chen@managepetro.com','ON-CDL-10891','A','2025-11-20',TRUE,'2025-09-10',TRUE,8,'active',11.00,'Toronto, ON','Toronto',32.75,'Class A CDL, HazMat, Tanker','2018-06-22','2024-05-10','2026-05-10'),
@@ -55,7 +95,19 @@ INSERT INTO drivers (employee_id, first_name, last_name, phone, email, license_n
 -- =====================
 -- Stations (~78, multiple per city CA + US)
 -- =====================
-INSERT INTO stations (code, name, lat, lon, city, region, fuel_type, capacity_liters, current_level_liters, request_method, low_fuel_threshold) VALUES
+INSERT INTO stations (
+  code,
+  name,
+  lat,
+  lon,
+  city,
+  region,
+  fuel_type,
+  capacity_liters,
+  current_level_liters,
+  request_method,
+  low_fuel_threshold
+) VALUES
 -- Canada: Toronto (6)
 ('S001','Manage Petro - Toronto East',43.6530,-79.3400,'Toronto','ON','diesel',120000,26000,'IoT',30000),
 ('S002','Manage Petro - Toronto West',43.6490,-79.3800,'Toronto','ON','diesel',110000,23000,'IoT',30000),
@@ -98,7 +150,7 @@ INSERT INTO stations (code, name, lat, lon, city, region, fuel_type, capacity_li
 ('S029','Manage Petro - London',42.9849,-81.2453,'London','ON','gasoline',88000,23000,'Manual',28000),
 ('S030','Manage Petro - Windsor',42.3149,-83.0364,'Windsor','ON','diesel',90000,24000,'IoT',30000),
 -- St John’s + Charlottetown + Red Deer + Sudbury + Thunder Bay
-('S031','Manage Petro - St Johns',47.5615,-52.7126,'St John\'s','NL','diesel',74000,18000,'IoT',22000),
+('S031','Manage Petro - St Johns',47.5615,-52.7126,'St John''s','NL','diesel',74000,18000,'IoT',22000),
 ('S032','Manage Petro - Charlottetown',46.2382,-63.1311,'Charlottetown','PE','diesel',70000,17000,'IoT',20000),
 ('S033','Manage Petro - Red Deer',52.2681,-113.8112,'Red Deer','AB','gasoline',82000,24000,'Manual',26000),
 ('S034','Manage Petro - Sudbury',46.4917,-80.9930,'Sudbury','ON','diesel',78000,21000,'IoT',23000),
@@ -164,7 +216,18 @@ INSERT INTO stations (code, name, lat, lon, city, region, fuel_type, capacity_li
 -- =====================
 -- Trucks (30 trucks assigned to drivers)
 -- =====================
-INSERT INTO trucks (code, plate, capacity_liters, fuel_level_percent, fuel_type, status, current_driver_id, current_location, last_maintenance_date, next_maintenance_date) VALUES
+INSERT INTO trucks (
+  code,
+  plate,
+  capacity_liters,
+  fuel_level_percent,
+  fuel_type,
+  status,
+  current_driver_id,
+  current_location,
+  last_maintenance_date,
+  next_maintenance_date
+) VALUES
 ('T01','AB-1421',32000,FLOOR(RANDOM()*50)+50,'diesel','active',1,'Toronto, ON','2024-09-15','2025-03-15'),
 ('T02','BC-4422',30000,FLOOR(RANDOM()*50)+50,'gasoline','active',2,'Toronto, ON','2024-08-20','2025-02-20'),
 ('T03','QC-9832',31000,FLOOR(RANDOM()*50)+50,'diesel','maintenance',NULL,'Toronto Maintenance Bay','2024-10-28','2024-11-15'),
@@ -199,7 +262,13 @@ INSERT INTO trucks (code, plate, capacity_liters, fuel_level_percent, fuel_type,
 -- =====================
 -- Truck compartments (2 per truck)
 -- =====================
-INSERT INTO truck_compartments (truck_id, compartment_number, fuel_type, capacity_liters, current_level_liters) VALUES
+INSERT INTO truck_compartments (
+  truck_id,
+  compartment_number,
+  fuel_type,
+  capacity_liters,
+  current_level_liters
+) VALUES
 (1,1,'diesel',16000,14000),(1,2,'diesel',16000,15000),
 (2,1,'gasoline',15000,13500),(2,2,'gasoline',15000,12500),
 (3,1,'diesel',15500,13000),(3,2,'diesel',15500,14000),
@@ -234,7 +303,13 @@ INSERT INTO truck_compartments (truck_id, compartment_number, fuel_type, capacit
 -- =====================
 -- Deliveries (70 mixed, trucks → stations)
 -- =====================
-INSERT INTO deliveries (truck_id, station_id, volume_liters, delivery_date, status) VALUES
+INSERT INTO deliveries (
+  truck_id,
+  station_id,
+  volume_liters,
+  delivery_date,
+  status
+) VALUES
 (1,1,28000, NOW() + INTERVAL '1 DAY','planned'),
 (2,2,25000, NOW() + INTERVAL '2 DAY','planned'),
 (3,3,26000, NOW() + INTERVAL '1 DAY','enroute'),
@@ -318,7 +393,11 @@ INSERT INTO deliveries (truck_id, station_id, volume_liters, delivery_date, stat
 -- =====================
 -- Station fuel levels (3 days per station: 80 * 3 = 240 rows)
 -- =====================
-INSERT INTO station_fuel_levels (station_id, recorded_at, fuel_level_liters) VALUES
+INSERT INTO station_fuel_levels (
+  station_id,
+  recorded_at,
+  fuel_level_liters
+) VALUES
 -- 1..10
 (1,NOW() - INTERVAL '3 DAY',30000),(1,NOW() - INTERVAL '2 DAY',27000),(1,NOW() - INTERVAL '1 DAY',25000),
 (2,NOW() - INTERVAL '3 DAY',20000),(2,NOW() - INTERVAL '2 DAY',19000),(2,NOW() - INTERVAL '1 DAY',18000),
@@ -407,3 +486,5 @@ INSERT INTO station_fuel_levels (station_id, recorded_at, fuel_level_liters) VAL
 (78,NOW() - INTERVAL '3 DAY',31000),(78,NOW() - INTERVAL '2 DAY',30500),(78,NOW() - INTERVAL '1 DAY',30000),
 (79,NOW() - INTERVAL '3 DAY',23000),(79,NOW() - INTERVAL '2 DAY',22500),(79,NOW() - INTERVAL '1 DAY',22000),
 (80,NOW() - INTERVAL '3 DAY',26000),(80,NOW() - INTERVAL '2 DAY',25500),(80,NOW() - INTERVAL '1 DAY',25000);
+
+COMMIT;
