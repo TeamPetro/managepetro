@@ -23,7 +23,7 @@ BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language ''plpgsql'';
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS drivers (
   hazmat_expiry_date DATE,
   tanker_endorsement BOOLEAN DEFAULT FALSE,
   years_experience INT DEFAULT 0,
-  status VARCHAR(20) DEFAULT ''active'' CHECK (status IN (''active'', ''on_leave'', ''inactive'')),
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'on_leave', 'inactive')),
   max_hours_per_shift DECIMAL(4,2) DEFAULT 12.00,
   current_location VARCHAR(255),
   home_terminal VARCHAR(100),
@@ -74,10 +74,10 @@ CREATE TABLE IF NOT EXISTS stations (
   lon DECIMAL(9,6),
   city VARCHAR(100),
   region VARCHAR(100),
-  fuel_type VARCHAR(20) DEFAULT ''diesel'' CHECK (fuel_type IN (''diesel'', ''gasoline'', ''propane'')),
+  fuel_type VARCHAR(20) DEFAULT 'diesel' CHECK (fuel_type IN ('diesel', 'gasoline', 'propane')),
   capacity_liters DECIMAL(12,2),
   current_level_liters DECIMAL(12,2),
-  request_method VARCHAR(20) DEFAULT ''Manual'' CHECK (request_method IN (''IoT'', ''Manual'')),
+  request_method VARCHAR(20) DEFAULT 'Manual' CHECK (request_method IN ('IoT', 'Manual')),
   low_fuel_threshold DECIMAL(12,2) DEFAULT 5000
 );
 
@@ -89,8 +89,8 @@ CREATE TABLE IF NOT EXISTS trucks (
   plate VARCHAR(32),
   capacity_liters DECIMAL(12,2),
   fuel_level_percent SMALLINT,
-  fuel_type VARCHAR(20) DEFAULT ''diesel'' CHECK (fuel_type IN (''diesel'', ''gasoline'', ''propane'')),
-  status VARCHAR(20) DEFAULT ''active'' CHECK (status IN (''active'', ''maintenance'', ''offline'')),
+  fuel_type VARCHAR(20) DEFAULT 'diesel' CHECK (fuel_type IN ('diesel', 'gasoline', 'propane')),
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'maintenance', 'offline')),
   current_driver_id INT,
   last_maintenance_date DATE,
   next_maintenance_date DATE,
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS deliveries (
   estimated_duration_minutes INT,
   actual_duration_minutes INT,
   distance_km DECIMAL(8,2),
-  status VARCHAR(20) DEFAULT ''planned'' CHECK (status IN (''planned'', ''enroute'', ''delivered'', ''canceled'')),
+  status VARCHAR(20) DEFAULT 'planned' CHECK (status IN ('planned', 'enroute', 'delivered', 'canceled')),
   notes TEXT,
   FOREIGN KEY (truck_id) REFERENCES trucks(id),
   FOREIGN KEY (station_id) REFERENCES stations(id),
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS truck_compartments (
   id SERIAL PRIMARY KEY,
   truck_id INT NOT NULL,
   compartment_number INT NOT NULL,
-  fuel_type VARCHAR(20) NOT NULL CHECK (fuel_type IN (''diesel'', ''gasoline'', ''propane'')),
+  fuel_type VARCHAR(20) NOT NULL CHECK (fuel_type IN ('diesel', 'gasoline', 'propane')),
   capacity_liters DECIMAL(12,2) NOT NULL,
   current_level_liters DECIMAL(12,2) DEFAULT 0,
   FOREIGN KEY (truck_id) REFERENCES trucks(id),
@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS driver_shifts (
   shift_end TIMESTAMP,
   total_hours DECIMAL(4,2),
   break_hours DECIMAL(4,2) DEFAULT 0,
-  status VARCHAR(20) DEFAULT ''active'' CHECK (status IN (''active'', ''completed'', ''interrupted'')),
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'interrupted')),
   notes TEXT,
   FOREIGN KEY (driver_id) REFERENCES drivers(id) ON DELETE CASCADE
 );
