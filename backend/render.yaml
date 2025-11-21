@@ -16,8 +16,6 @@ services:
     preDeployCommand: python init_production_db.py
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12
       # Set DATABASE_URL to your Supabase connection string in Render dashboard
       # Get it from: Supabase Dashboard > Project Settings > Database > Connection String
       # Use Session Mode pooler for persistent servers: postgresql://...@aws-0-[region].pooler.supabase.com:5432/postgres
@@ -36,7 +34,7 @@ services:
       - key: JWT_ALGORITHM
         value: HS256
       - key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
-        value: 30
+        value: "30"
       - key: DEFAULT_LLM_MODEL
         value: models/gemini-2.0-flash-exp
       - key: FRONTEND_URL
@@ -45,7 +43,7 @@ services:
       # Set to "true" to force re-seed database on every deployment (clears and re-inserts all data)
       # Set to "false" to only seed if database is empty (preserves existing data)
       - key: FORCE_DB_SEED
-        value: true  # Always re-seed on deployment to ensure fresh data
+        value: "true"  # Always re-seed on deployment to ensure fresh data
       
   # Frontend Static Site  
   # Note: Frontend is NOT included in this blueprint (only backend/ is deployed)
