@@ -2,6 +2,8 @@
 -- Run as a SQL script (e.g., in Supabase SQL editor or migration)
 -- Assumes all tables are in the "public" schema.
 
+BEGIN;
+
 SET search_path TO public;
 
 -- =====================
@@ -484,3 +486,5 @@ INSERT INTO station_fuel_levels (
 (78,NOW() - INTERVAL '3 DAY',31000),(78,NOW() - INTERVAL '2 DAY',30500),(78,NOW() - INTERVAL '1 DAY',30000),
 (79,NOW() - INTERVAL '3 DAY',23000),(79,NOW() - INTERVAL '2 DAY',22500),(79,NOW() - INTERVAL '1 DAY',22000),
 (80,NOW() - INTERVAL '3 DAY',26000),(80,NOW() - INTERVAL '2 DAY',25500),(80,NOW() - INTERVAL '1 DAY',25000);
+
+COMMIT;
