@@ -1,22 +1,20 @@
-import { CogIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
-
 function ActionButtons({ onEditParameters, onViewReferences }) {
   return (
-    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+    <div className="flex flex-wrap items-center justify-end gap-3">
       <button
+        type="button"
         onClick={onEditParameters}
-        className="flex items-center justify-center space-x-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 px-4 sm:px-6 py-2 sm:py-3 rounded-lg text-sm sm:text-base font-medium transition-colors"
+        className="inline-flex items-center rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-100 hover:bg-slate-700 hover:border-slate-500 transition-colors"
       >
-        <CogIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-        <span>Edit Parameters</span>
+        Edit Parameters
       </button>
 
       <button
+        type="button"
         onClick={onViewReferences}
-        className="flex items-center justify-center space-x-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 px-4 sm:px-6 py-2 sm:py-3 rounded-lg text-sm sm:text-base font-medium transition-colors"
+        className="inline-flex items-center rounded-lg border border-slate-600 bg-slate-800/40 px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-100 hover:bg-slate-700 hover:border-slate-500 transition-colors"
       >
-        <DocumentTextIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-        <span>View References</span>
+        View References
       </button>
     </div>
   );
