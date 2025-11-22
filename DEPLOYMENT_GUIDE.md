@@ -1,4 +1,4 @@
-# 🚀 Complete Deployment Guide for ManagePetro
+# 🚀 Complete Deployment Guide for ManagePetro Solutions
 
 **Welcome!** This guide will help you deploy the ManagePetro application to production. Don't worry if you're not technical - we'll walk through every single step together.
 
