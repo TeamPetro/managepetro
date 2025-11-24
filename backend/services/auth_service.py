@@ -161,16 +161,17 @@ class AuthService:
 
         if not user:
             # Perform dummy hash operation to prevent timing attacks.
+            # Use the precomputed fake hash to avoid expensive hash() calls
             try:
                 if self._fake_hashed is not None:
                     # Verify against the precomputed fake hash to keep timing
                     # characteristics similar to a real user verification.
-                    password_hash.verify("managepetro_dummy_hash", self._fake_hashed)
+                    password_hash.verify(password, self._fake_hashed)
                 else:
                     # Last resort: fall back to a one-off hash/verify to keep
                     # behavior correct, but this should be rare.
                     tmp = password_hash.hash("managepetro_dummy_hash")
-                    password_hash.verify("managepetro_dummy_hash", tmp)
+                    password_hash.verify(password, tmp)
             except Exception:
                 # Swallow any exception: the goal is only to make timing similar
                 self._logger.debug(

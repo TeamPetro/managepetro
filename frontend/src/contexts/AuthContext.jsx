@@ -46,10 +46,21 @@ export const AuthProvider = ({ children }) => {
       if (error.response && error.response.data) {
         return {
           success: false,
-          error: error.response.data.detail || "Login failed",
+          error:
+            error.response.data.detail ||
+            "Login failed. Please check your credentials.",
         };
       }
-      return { success: false, error: "Network error. Please try again." };
+      if (error.code === "ECONNABORTED") {
+        return {
+          success: false,
+          error: "Login timed out. The server may be slow. Please try again.",
+        };
+      }
+      return {
+        success: false,
+        error: "Unable to connect to server. Please check your connection.",
+      };
     }
   };
 
@@ -62,12 +73,34 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       // Handle registration errors specifically
       if (error.response && error.response.data) {
+        const detail = error.response.data.detail || "Registration failed";
+        // Make error messages more user-friendly
+        if (detail.includes("Username already exists")) {
+          return {
+            success: false,
+            error: "This username is already taken. Please choose another.",
+          };
+        }
+        if (detail.includes("Email already registered")) {
+          return {
+            success: false,
+            error:
+              "This email is already registered. Please login or use a different email.",
+          };
+        }
+        return { success: false, error: detail };
+      }
+      if (error.code === "ECONNABORTED") {
         return {
           success: false,
-          error: error.response.data.detail || "Registration failed",
+          error:
+            "Registration timed out. The server may be slow. Please try again.",
         };
       }
-      return { success: false, error: "Network error. Please try again." };
+      return {
+        success: false,
+        error: "Unable to connect to server. Please check your connection.",
+      };
     }
   };
 
