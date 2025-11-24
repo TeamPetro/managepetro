@@ -1,0 +1,21 @@
+# GitHub language statistics configuration
+# Exclude auto-generated files from contributor statistics and language detection
+
+# Exclude package-lock.json from statistics (npm lockfile)
+package-lock.json linguist-generated=true
+
+# Exclude other common lockfiles from statistics
+yarn.lock linguist-generated=true
+pnpm-lock.yaml linguist-generated=true
+
+# Python: Exclude pip lockfiles and requirements.txt from statistics
+requirements.txt linguist-generated=true
+requirements-dev.txt linguist-generated=true
+Pipfile.lock linguist-generated=true
+poetry.lock linguist-generated=true
+
+# Exclude common auto-generated or vendored files
+dist/** linguist-generated=true
+build/** linguist-generated=true
+*.min.js linguist-generated=true
+*.min.css linguist-generated=true
