@@ -1,5 +1,5 @@
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 from constants import DEFAULT_FUEL_CONSUMPTION_RATE
 from models.data_models import (
@@ -61,7 +61,7 @@ class PromptService:
         variables = {
             "from_location": from_location,
             "to_location": to_location,
-            "current_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "current_time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             "stations_data": stations_text,
             "historical_routes": historical_text,
             "weather_conditions": weather_text,

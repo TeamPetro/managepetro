@@ -4,6 +4,7 @@ SQLAlchemy 2.0 database models for ManagePetro application.
 These models correspond to the database schema and provide type-safe
 database operations using SQLAlchemy's modern declarative approach.
 """
+
 from sqlalchemy.schema import CreateIndex
 from sqlalchemy.ext.compiler import compiles
 from datetime import datetime, date
@@ -17,13 +18,11 @@ from sqlalchemy import (
     Enum,
     DECIMAL,
     Text,
-    TIMESTAMP,
     ForeignKey,
     Index,
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
 from constants import (
     DEFAULT_FUEL_TYPE,
     DEFAULT_LOW_FUEL_THRESHOLD,
@@ -58,10 +57,14 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    # Timestamps are set by application code (auth_service) for PostgreSQL/MySQL compatibility
-    # Using func.current_timestamp() causes issues with PostgreSQL timezone handling
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    # Timestamps are set by application code with timezone-aware datetimes
+    # Using DateTime(timezone=True) for PostgreSQL TIMESTAMP WITH TIME ZONE compatibility
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
 
     # Indexes for performance
     __table_args__ = (
@@ -109,9 +112,9 @@ class Driver(Base):
     hired_date: Mapped[Optional[date]] = mapped_column(Date)
     last_medical_exam: Mapped[Optional[date]] = mapped_column(Date)
     next_medical_exam: Mapped[Optional[date]] = mapped_column(Date)
-    # Timestamps should be set by application code for PostgreSQL/MySQL compatibility
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    # Timestamps set by application code with timezone-aware datetimes
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     @property
     def full_name(self) -> str:
@@ -240,8 +243,8 @@ class Delivery(Base):
         Integer, ForeignKey("drivers.id", ondelete="SET NULL")
     )
     volume_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
-    delivery_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    completed_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    delivery_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    completed_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     estimated_duration_minutes: Mapped[Optional[int]] = mapped_column(Integer)
     actual_duration_minutes: Mapped[Optional[int]] = mapped_column(Integer)
     distance_km: Mapped[Optional[float]] = mapped_column(DECIMAL(8, 2))
@@ -286,8 +289,8 @@ class StationFuelLevel(Base):
     station_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("stations.id", ondelete="CASCADE")
     )
-    # recorded_at should be set by application code for PostgreSQL/MySQL compatibility
-    recorded_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    # recorded_at should be set by application code with timezone-aware datetimes
+    recorded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     fuel_level_liters: Mapped[Optional[float]] = mapped_column(DECIMAL(12, 2))
 
     # Relationships
@@ -341,7 +344,7 @@ class WeatherData(Base):
     condition: Mapped[Optional[str]] = mapped_column(Text)
     wind: Mapped[Optional[float]] = mapped_column(DECIMAL(5, 2))
     humidity: Mapped[Optional[float]] = mapped_column(DECIMAL(5, 2))
-    collected_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
+    collected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class DriverShift(Base):
@@ -353,8 +356,10 @@ class DriverShift(Base):
     driver_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False
     )
-    shift_start: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    shift_end: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    shift_start: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    shift_end: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     total_hours: Mapped[Optional[float]] = mapped_column(DECIMAL(4, 2))
     break_hours: Mapped[float] = mapped_column(DECIMAL(4, 2), default=0)
     status: Mapped[str] = mapped_column(

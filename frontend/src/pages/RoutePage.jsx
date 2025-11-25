@@ -2,6 +2,7 @@ import RouteForm from "../components/RouteForm";
 import ActionButtons from "../components/ActionButtons";
 import ETADisplay from "../components/ETADisplay";
 import InstructionsList from "../components/InstructionsList";
+import RouteMap from "../components/RouteMap";
 import WeatherImpactCard from "../components/WeatherImpactCard";
 import TrafficConditionsCard from "../components/TrafficConditionsCard";
 import FuelStationsCard from "../components/FuelStationsCard";
@@ -21,39 +22,65 @@ function RoutePage({ selectedLLM }) {
     useRouteData();
 
   const handleRouteSubmit = async (from, to, timeData = {}) => {
-    console.log("Using LLM:", selectedLLM);
     await calculateRoute(from, to, selectedLLM, timeData);
   };
 
-  const handleEditParameters = () => {
-    console.log("Edit parameters clicked");
-  };
+  const handleEditParameters = () => {};
+  const handleViewReferences = () => {};
 
-  const handleViewReferences = () => {
-    console.log("View references clicked");
-  };
-
-  // Safely check if we have results
   const hasResults = !!routeData?.eta && !isLoading;
 
   return (
     <PageLayout maxWidth="6xl">
-      {/* Global loading bar while the route is being calculated */}
       <RouteLoadingBar isLoading={isLoading} />
 
-      {/* Whole page: main column + skinny sidebar on large screens */}
       <div className="grid gap-8 lg:grid-cols-[minmax(0,2.4fr)_minmax(260px,1fr)] items-start">
-        {/* ================= MAIN COLUMN ================= */}
-        <div className="space-y-8">
-          {/* 1. Plan route – full size before results, collapsible after */}
-          {!hasResults ? (
-            // FULL SIZE FORM when no results yet
-            <section className="space-y-4">
-              <h2 className="text-lg font-semibold text-slate-100">
-                Plan Delivery Route
-              </h2>
+        {/* ================= FULL-WIDTH PLANNER ================= */}
+        {!hasResults && (
+          <section className="space-y-4 lg:col-span-2">
+            <h2 className="text-lg font-semibold text-slate-100">
+              Plan Delivery Route
+            </h2>
 
-              <div className="space-y-6">
+            <div className="space-y-6">
+              <RouteForm onSubmit={handleRouteSubmit} isLoading={isLoading} />
+
+              {error && (
+                <AIErrorMessage
+                  message={error}
+                  context="route"
+                  onRetry={() =>
+                    calculateRoute(routeData?.from, routeData?.to, selectedLLM)
+                  }
+                  onDismiss={clearRoute}
+                />
+              )}
+
+              {isLoading && <LoadingSpinner />}
+            </div>
+
+            {/* Small tucked-away controls */}
+            <div className="flex justify-end">
+              <div className="text-xs text-slate-400">
+                <ActionButtons
+                  onEditParameters={handleEditParameters}
+                  onViewReferences={handleViewReferences}
+                />
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ================= MAIN COLUMN ================= */}
+        {hasResults && (
+          <div className="space-y-10">
+            {/* --- Collapsible mini planner --- */}
+            <CollapsibleSection
+              title="Edit Delivery Route"
+              description="Update origin, destination, or scheduling parameters and recalculate."
+              defaultOpen={false}
+            >
+              <div className="space-y-4">
                 <RouteForm onSubmit={handleRouteSubmit} isLoading={isLoading} />
 
                 {error && (
@@ -71,130 +98,95 @@ function RoutePage({ selectedLLM }) {
                   />
                 )}
 
-                {/* Optional: keep spinner OR remove this line if you want only the bar */}
-                {isLoading && <LoadingSpinner />}
-              </div>
-            </section>
-          ) : (
-            // SMALLER COLLAPSIBLE FORM when results exist
-            <CollapsibleSection
-              title="Edit Delivery Route"
-              description="Update origin, destination, or scheduling parameters and recalculate."
-              defaultOpen={false}
-            >
-              <div className="space-y-4">
-                <RouteForm
-                  onSubmit={handleRouteSubmit}
-                  isLoading={isLoading}
-                />
-
-                {error && (
-                  <AIErrorMessage
-                    message={error}
-                    context="route"
-                    onRetry={() =>
-                      calculateRoute(
-                        routeData?.from,
-                        routeData?.to,
-                        selectedLLM
-                      )
-                    }
-                    onDismiss={clearRoute}
-                  />
-                )}
-
                 {isLoading && <LoadingSpinner />}
               </div>
             </CollapsibleSection>
-          )}
 
-          {/* 2. Trip overview + directions (collapsible, only when we have data) */}
-          {hasResults && (
-            <CollapsibleSection
-              title="Trip Overview"
-              description="High-level summary, ETA, and detailed turn-by-turn instructions."
-              defaultOpen={true}
-            >
-              <div className="space-y-6">
-                <div className="grid gap-6 lg:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.4fr)] items-start">
-                  {/* Left: summary cards */}
-                  <div className="space-y-6">
-                    <ETADisplay eta={routeData.eta} />
+            {/* Small, subtle buttons under the mini planner */}
+            <div className="flex justify-end">
+              <div className="text-xs text-slate-400">
+                <ActionButtons
+                  onEditParameters={handleEditParameters}
+                  onViewReferences={handleViewReferences}
+                />
+              </div>
+            </div>
 
-                    {(routeData.aiAnalysis || routeData.routeSummary) && (
-                      <AIAnalysisCard
-                        aiAnalysis={routeData.aiAnalysis}
-                        routeSummary={routeData.routeSummary}
-                      />
-                    )}
-                  </div>
+            {/* --- Balanced, aesthetic grid layout --- */}
+            <div className="space-y-10">
+              {/* 2-column grid with matching panel styles */}
+              <div className="grid gap-8 lg:grid-cols-2">
+                {/* LEFT PANEL */}
+                <div className="space-y-6 bg-slate-900/60 border border-slate-800 rounded-2xl p-6 h-full">
+                  <ETADisplay eta={routeData.eta} />
 
-                  {/* Right: detailed directions */}
-                  <div>
-                    <InstructionsList instructions={routeData.instructions} />
-                  </div>
+                  {(routeData.aiAnalysis || routeData.routeSummary) && (
+                    <AIAnalysisCard
+                      aiAnalysis={routeData.aiAnalysis}
+                      routeSummary={routeData.routeSummary}
+                    />
+                  )}
+                </div>
+
+                {/* RIGHT PANEL */}
+                <div className="space-y-6 bg-slate-900/60 border border-slate-800 rounded-2xl p-6 h-full">
+                  <InstructionsList
+                    instructions={routeData.instructions}
+                    maneuvers={routeData.maneuvers}
+                  />
                 </div>
               </div>
+
+              {/* MAP tucked below in a clean card */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+                <RouteMap routeData={routeData} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= SIDEBAR ================= */}
+        <aside className="space-y-5 lg:border-l lg:border-slate-800 lg:pl-6 text-sm">
+          {hasResults && (
+            <CollapsibleSection
+              title="Current Conditions"
+              description="Weather and traffic factors that may impact this route."
+              defaultOpen={true}
+            >
+              <div className="space-y-4">
+                {routeData?.weatherImpact && (
+                  <WeatherImpactCard weatherImpact={routeData.weatherImpact} />
+                )}
+
+                {routeData?.trafficConditions && (
+                  <TrafficConditionsCard
+                    trafficConditions={routeData.trafficConditions}
+                  />
+                )}
+              </div>
             </CollapsibleSection>
           )}
-        </div>
 
-        {/* ================= SIDEBAR COLUMN ================= */}
-        <aside className="space-y-5 lg:border-l lg:border-slate-800 lg:pl-6 text-sm">
-          {/* Controls */}
-          <section className="space-y-3">
-            <p className="text-sm font-medium text-slate-300 tracking-wide uppercase">
-              Controls
-            </p>
-            <ActionButtons
-              onEditParameters={handleEditParameters}
-              onViewReferences={handleViewReferences}
-            />
-          </section>
-
-          {/* Current conditions – collapsible */}
-          <CollapsibleSection
-            title="Current Conditions"
-            description="Weather and traffic factors that may impact this route."
-            defaultOpen={true}
-          >
-            <div className="space-y-4">
-              {routeData?.weatherImpact && (
-                <WeatherImpactCard weatherImpact={routeData.weatherImpact} />
-              )}
-
-              {routeData?.trafficConditions && (
-                <TrafficConditionsCard
-                  trafficConditions={routeData.trafficConditions}
-                />
-              )}
-            </div>
-          </CollapsibleSection>
-
-          {/* Fleet & data snapshot – collapsible, only with results */}
           {hasResults && (
             <CollapsibleSection
               title="Fleet & Data Snapshot"
               description="Supporting operational context for this delivery."
-              defaultOpen={false} // starts closed so sidebar feels lighter
+              defaultOpen={false}
             >
               <div className="space-y-4">
-                {routeData?.availableTrucks &&
-                  routeData.availableTrucks.length > 0 && (
-                    <AvailableTrucksCard trucks={routeData.availableTrucks} />
-                  )}
+                {routeData?.availableTrucks?.length > 0 && (
+                  <AvailableTrucksCard trucks={routeData.availableTrucks} />
+                )}
 
-                {routeData?.fuelStations &&
-                  routeData.fuelStations.length > 0 && (
-                    <FuelStationsCard fuelStations={routeData.fuelStations} />
-                  )}
+                {routeData?.fuelStations?.length > 0 && (
+                  <FuelStationsCard fuelStations={routeData.fuelStations} />
+                )}
 
-                {routeData?.recentDeliveries &&
-                  routeData.recentDeliveries.length > 0 && (
-                    <RecentDeliveriesCard
-                      deliveries={routeData.recentDeliveries}
-                    />
-                  )}
+                {routeData?.recentDeliveries?.length > 0 && (
+                  <RecentDeliveriesCard
+                    deliveries={routeData.recentDeliveries}
+                  />
+                )}
 
                 {routeData?.dataSources && (
                   <DataSourcesCard dataSources={routeData.dataSources} />

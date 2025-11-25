@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import 'leaflet/dist/leaflet.css';
 @tailwind utilities;
 
 @layer base {
@@ -34,6 +35,11 @@ html.dark {
   --border-gray-200: #374151;
   --border-gray-300: #4b5563;
   --border-gray-600: #1f2937;
+  --bg-indigo-50: #1a1a2b;
+  --border-indigo-200: #3f3f5f;
+
+  --hover-bg-gray-100: #1f2937;
+  --hover-bg-gray-50: #0b1220;
 }
 
 /* Map Tailwind utility classes to dark colors when html.dark is active.
@@ -69,15 +75,14 @@ html.dark .text-gray-500 {
   color: var(--text-gray-500) !important;
 }
 
-html.dark .border-gray-200 {
-  border-color: var(--border-gray-200) !important;
-}
-html.dark .border-gray-300 {
-  border-color: var(--border-gray-300) !important;
-}
-html.dark .border-gray-600 {
-  border-color: var(--border-gray-600) !important;
-}
+html.dark .border-gray-200 { border-color: var(--border-gray-200) !important; }
+html.dark .border-gray-300 { border-color: var(--border-gray-300) !important; }
+html.dark .border-gray-600 { border-color: var(--border-gray-600) !important; }
+html.dark .bg-indigo-50 {background-color: var(--bg-indigo-50) !important;}
+html.dark .border-indigo-200 {border-color: var(--border-indigo-200) !important;}
+
+html.dark .hover\:bg-gray-100:hover { background-color: var(--hover-bg-gray-100) !important; }
+html.dark .hover\:bg-gray-50:hover { background-color: var(--hover-bg-gray-50) !important; }
 
 html.dark input,
 html.dark select,

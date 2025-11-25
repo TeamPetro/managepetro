@@ -12,9 +12,22 @@ export { DEFAULT_LLM_MODEL };
 /**
  * Available LLM models for selection
  */
-// Only allow Gemini 2.5 Flash as selectable model
 export const LLM_MODELS = [
+  // Google Gemini
   { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  
+  // Groq Models (Free) - Current production models
+  { value: "groq:llama-3.1-8b-instant", label: "Llama 3.1 8B (Free)" },
+  { value: "groq:llama-3.3-70b-versatile", label: "Llama 3.3 70B (Free)" },
+  
+  // OpenAI Models
+  { value: "openai:gpt-4o", label: "ChatGPT-4o" },
+  { value: "openai:gpt-4o-mini", label: "ChatGPT-4o Mini" },
+  
+  // Anthropic Models
+  { value: "anthropic:claude-3-5-sonnet-latest", label: "Claude 3.5 Sonnet" },
+  { value: "anthropic:claude-3-5-haiku-latest", label: "Claude 3.5 Haiku" },
+
 ];
 
 /**
