@@ -166,6 +166,92 @@ app.add_middleware(
 llm_service = LLMService()
 
 
+# Simple coordinate lookup for major cities
+CITY_COORDINATES = {
+    'vancouver': (49.2827, -123.1207),
+    'calgary': (51.0447, -114.0719),
+    'toronto': (43.6532, -79.3832),
+    'montreal': (45.5017, -73.5673),
+    'winnipeg': (49.8951, -97.1384),
+    'edmonton': (53.5461, -113.4938),
+    'ottawa': (45.4215, -75.6972),
+    'hamilton': (43.2557, -79.8711),
+    'london': (42.9849, -81.2453),
+    'kitchener': (43.4643, -80.5204),
+    'burnaby': (49.2488, -122.9805),
+    'richmond': (49.1666, -123.1336),
+    'surrey': (49.1913, -122.8490),
+    'mississauga': (43.5890, -79.6441),
+    'markham': (43.8561, -79.3370),
+}
+
+
+def get_coordinates_for_location(location: str) -> tuple:
+    """Get coordinates for a location name"""
+    if not location:
+        return None
+    
+    location_normalized = location.lower().strip()
+    
+    # Direct match
+    if location_normalized in CITY_COORDINATES:
+        return CITY_COORDINATES[location_normalized]
+    
+    # Partial match
+    for city, coords in CITY_COORDINATES.items():
+        if location_normalized in city or city in location_normalized:
+            return coords
+    
+    return None
+
+
+def parse_tomtom_route_response(route_data: dict) -> dict:
+    """Extract route geometry and maneuvers from TomTom response"""
+    try:
+        routes = route_data.get("routes", [])
+        if not routes:
+            return {"route_geometry": [], "maneuvers": []}
+        
+        route = routes[0]
+        
+        # Extract route geometry (coordinates)
+        geometry = []
+        legs = route.get("legs", [])
+        for leg in legs:
+            points = leg.get("points", [])
+            for point in points:
+                if "latitude" in point and "longitude" in point:
+                    geometry.append([point["latitude"], point["longitude"]])
+        
+        # Extract maneuvers (turn-by-turn instructions)
+        maneuvers = []
+        for leg in legs:
+            leg_points = leg.get("points", [])
+            for i, point in enumerate(leg_points):
+                if "instruction" in point:
+                    maneuver = {
+                        "step_number": i + 1,
+                        "instruction": point.get("instruction", "Continue"),
+                        "coordinates": [point.get("latitude"), point.get("longitude")],
+                        "distance_display": f"{point.get('routeOffsetInMeters', 0)}m",
+                        "maneuver_type": "continue"
+                    }
+                    maneuvers.append(maneuver)
+        
+        return {
+            "route_geometry": geometry,
+            "maneuvers": maneuvers,
+            "route_metadata": {
+                "route_source": "TomTom",
+                "total_distance": route.get("summary", {}).get("lengthInMeters", 0),
+                "total_time": route.get("summary", {}).get("travelTimeInSeconds", 0)
+            }
+        }
+    except Exception as e:
+        _logger.warning(f"Failed to parse TomTom route response: {e}")
+        return {"route_geometry": [], "maneuvers": []}
+
+
 # API Endpoints below
 @app.post("/api/routes/optimize")
 async def optimize_route_ai(
@@ -173,9 +259,9 @@ async def optimize_route_ai(
     current_user: User = Depends(get_current_active_user),
     session: AsyncSession = Depends(get_db_session),
 ):
-    """AI-powered route optimization using markdown-refined prompts (Protected)"""
+    """AI-powered route optimization with TomTom route geometry (Protected)"""
     try:
-        # Always use AI service - removed conditional check to match dispatch endpoint
+        # Get AI route optimization
         result = await llm_service.optimize_route(
             request.from_location,
             request.to_location,
@@ -188,7 +274,41 @@ async def optimize_route_ai(
             vehicle_type=request.vehicle_type,
             notes=request.notes,
         )
-        # Add user info to response and ensure ai_analysis is a string
+        
+        # Add TomTom route geometry if coordinates are available
+        from_coords = get_coordinates_for_location(request.from_location)
+        to_coords = get_coordinates_for_location(request.to_location)
+        
+        if from_coords and to_coords:
+            try:
+                _logger.info(f"Fetching TomTom route from {from_coords} to {to_coords}")
+                tomtom_data = await calculate_route_async(
+                    origin=from_coords,
+                    destination=to_coords,
+                    travelMode="truck",
+                    routeType="fastest"
+                )
+                
+                # Parse TomTom response and add to result
+                route_info = parse_tomtom_route_response(tomtom_data)
+                result.update(route_info)
+                
+                # Add coordinate metadata
+                result["route_metadata"] = result.get("route_metadata", {})
+                result["route_metadata"]["coordinates"] = {
+                    "from": {"lat": from_coords[0], "lon": from_coords[1]},
+                    "to": {"lat": to_coords[0], "lon": to_coords[1]}
+                }
+                
+                _logger.info(f"Added TomTom route geometry with {len(route_info.get('route_geometry', []))} points")
+                
+            except Exception as e:
+                _logger.warning(f"Failed to get TomTom route data: {e}")
+                # Continue without TomTom data - the AI response will still work
+        else:
+            _logger.warning(f"No coordinates found for route {request.from_location} to {request.to_location}")
+        
+        # Add user info to response
         result["requested_by"] = current_user.username
         return route_response_dict(result)
 
