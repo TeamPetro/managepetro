@@ -93,7 +93,7 @@ function AIAnalysisCard({ aiAnalysis, routeSummary }) {
           {routeSummary.optimizationFactors &&
             routeSummary.optimizationFactors.length > 0 && (
               <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
-                <p className="text-xs font-medium text-gray-700 mb-2">
+                <p className="text-xs font-medium text-gray-800 mb-2">
                   Optimization Factors:
                 </p>
                 <div className="flex flex-wrap gap-1.5">
