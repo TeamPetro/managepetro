@@ -105,12 +105,11 @@ import { DEFAULT_LLM_MODEL } from "./constants/config";
 
 // Function to get initial theme from localStorage or system preference
 const getInitialTheme = () => {
-  if (typeof window !== 'undefined' && localStorage.getItem('theme')) {
-    return localStorage.getItem('theme') === 'dark';
+  if (typeof window !== "undefined" && localStorage.getItem("theme")) {
+    return localStorage.getItem("theme") === "dark";
   }
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
 };
-
 
 function App() {
   const [selectedLLM, setSelectedLLM] = useState(DEFAULT_LLM_MODEL);
@@ -120,23 +119,22 @@ function App() {
   // 2. Effect to apply the 'dark' class to HTML and persist choice
   useEffect(() => {
     const htmlElement = document.documentElement;
-    
+
     if (darkMode) {
-      htmlElement.classList.add('dark');
+      htmlElement.classList.add("dark");
     } else {
-      htmlElement.classList.remove('dark');
+      htmlElement.classList.remove("dark");
     }
 
     // Persist the user's choice to localStorage
-    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
-
+    localStorage.setItem("theme", darkMode ? "dark" : "light");
   }, [darkMode]); // Reruns when darkMode state changes
 
   const toggleDarkMode = () => {
     // Simply update the state; the useEffect hook handles DOM and localStorage updates
-    setDarkMode(prevMode => !prevMode);
+    setDarkMode((prevMode) => !prevMode);
   };
-  
+
   // Memoize QueryClient to prevent recreating on each render (React 19 best practice)
   const queryClient = useMemo(
     () =>
@@ -158,13 +156,13 @@ function App() {
         <AuthProvider>
           <Router>
             {/* The outer div no longer needs a fixed bg color; the global CSS handles it */}
-            <div className="min-h-screen"> 
-              <Header 
-                selectedLLM={selectedLLM} 
-                onLLMChange={setSelectedLLM} 
+            <div className="min-h-screen">
+              <Header
+                selectedLLM={selectedLLM}
+                onLLMChange={setSelectedLLM}
                 // 3. Pass theme props down to Header component
-                darkMode={darkMode} 
-                toggleDarkMode={toggleDarkMode} 
+                darkMode={darkMode}
+                toggleDarkMode={toggleDarkMode}
               />
 
               <Routes>

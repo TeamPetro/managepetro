@@ -2,15 +2,14 @@
 @import 'leaflet/dist/leaflet.css';
 @tailwind utilities;
 
-
 @layer base {
-    body {
-        @apply bg-gray-50 text-gray-900;
-    }
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
 
-    html.dark body {
-        @apply bg-slate-800 text-gray-50;
-    }
+  html.dark body {
+    @apply bg-slate-800 text-gray-50;
+  }
 }
 
 /* Dark-mode utility overrides
@@ -20,7 +19,7 @@
 */
 html.dark {
   /* Override common background utilities */
-  --bg-white: #0f1724;         /* used in place of bg-white */
+  --bg-white: #0f1724; /* used in place of bg-white */
   --bg-gray-50: #0b1220;
   --bg-blue-50: #071428;
   --bg-purple-50: #0b0b1a;
@@ -47,16 +46,34 @@ html.dark {
    These are intentionally specific and small in number — add more selectors
    if more utilities are used across the app and require dark equivalents.
 */
-html.dark .bg-white { background-color: var(--bg-white) !important; }
-html.dark .bg-gray-50 { background-color: var(--bg-gray-50) !important; }
-html.dark .bg-blue-50 { background-color: var(--bg-blue-50) !important; }
-html.dark .bg-purple-50 { background-color: var(--bg-purple-50) !important; }
-html.dark .bg-red-50 { background-color: var(--bg-red-50) !important; }
+html.dark .bg-white {
+  background-color: var(--bg-white) !important;
+}
+html.dark .bg-gray-50 {
+  background-color: var(--bg-gray-50) !important;
+}
+html.dark .bg-blue-50 {
+  background-color: var(--bg-blue-50) !important;
+}
+html.dark .bg-purple-50 {
+  background-color: var(--bg-purple-50) !important;
+}
+html.dark .bg-red-50 {
+  background-color: var(--bg-red-50) !important;
+}
 
-html.dark .text-gray-900 { color: var(--text-gray-900) !important; }
-html.dark .text-gray-700 { color: var(--text-gray-700) !important; }
-html.dark .text-gray-600 { color: var(--text-gray-600) !important; }
-html.dark .text-gray-500 { color: var(--text-gray-500) !important; }
+html.dark .text-gray-900 {
+  color: var(--text-gray-900) !important;
+}
+html.dark .text-gray-700 {
+  color: var(--text-gray-700) !important;
+}
+html.dark .text-gray-600 {
+  color: var(--text-gray-600) !important;
+}
+html.dark .text-gray-500 {
+  color: var(--text-gray-500) !important;
+}
 
 html.dark .border-gray-200 { border-color: var(--border-gray-200) !important; }
 html.dark .border-gray-300 { border-color: var(--border-gray-300) !important; }
@@ -82,4 +99,21 @@ html.dark .bg-white.p-4,
 html.dark .bg-white.p-6,
 html.dark .bg-white.p-8 {
   background-color: #0b1220 !important;
+}
+
+@keyframes route-loading-bar {
+  0% {
+    transform: translateX(-100%) scaleX(0.3);
+  }
+  50% {
+    transform: translateX(-20%) scaleX(0.7);
+  }
+  100% {
+    transform: translateX(120%) scaleX(0.3);
+  }
+}
+
+.route-loading-bar {
+  transform-origin: left;
+  animation: route-loading-bar 1.7s ease-in-out infinite;
 }
