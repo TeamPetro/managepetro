@@ -291,11 +291,11 @@ function ImprovedDispatcherPage() {
           <div>
             <div className="flex items-center space-x-3 mb-2">
               <SparklesIcon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-700">
                 AI-Powered Dispatch Center
               </h1>
             </div>
-            <p className="text-sm sm:text-base text-slate-300">
+            <p className="text-sm sm:text-base text-slate-500">
               Let AI optimize your entire fleet dispatch strategy in seconds
             </p>
           </div>
