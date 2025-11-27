@@ -83,6 +83,11 @@ class RouteRequest(StrictModel):
         max_length=MAX_LOCATION_LENGTH,
         description="Destination location",
     )
+    waypoints: Optional[list[str]] = Field(
+        default=None,
+        description="Optional intermediate stops between origin and destination",
+        max_items=8,  # Reasonable limit to prevent overly complex routes
+    )
     llm_model: str = Field(
         default=DEFAULT_LLM_MODEL, description="AI model to use for optimization"
     )

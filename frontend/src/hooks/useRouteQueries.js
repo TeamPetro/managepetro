@@ -30,6 +30,7 @@ export function useOptimizeRoute() {
         delivery_date: timeData.deliveryDate || null,
         vehicle_type: timeData.vehicleType || "fuel_delivery_truck",
         notes: timeData.notes || null,
+        waypoints: timeData.waypoints || null,
       }),
   });
 }

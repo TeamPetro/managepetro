@@ -177,6 +177,28 @@ const RouteMap = ({ routeData, className = '' }) => {
             });
         }
 
+        // Add waypoint markers if available
+        if (routeData.route_metadata?.coordinates?.waypoints && routeData.route_metadata?.waypoint_names) {
+            routeData.route_metadata.coordinates.waypoints.forEach((waypoint, index) => {
+                const waypointName = routeData.route_metadata.waypoint_names[index] || `Stop ${index + 1}`;
+                markers.push({
+                    id: `waypoint-${index}`,
+                    position: [waypoint.lat, waypoint.lon],
+                    type: 'waypoint',
+                    color: '#F97316', // Orange color for waypoints
+                    popup: {
+                        title: `Stop ${index + 1}: ${waypointName}`,
+                        description: 'Route waypoint',
+                        details: {
+                            'Stop Number': index + 1,
+                            'Location': waypointName,
+                            'Coordinates': `${waypoint.lat.toFixed(4)}, ${waypoint.lon.toFixed(4)}`
+                        }
+                    }
+                });
+            });
+        }
+
         // Add maneuver markers from real TomTom data if available
         if (routeData.maneuvers && routeData.maneuvers.length > 0) {
             routeData.maneuvers.forEach((maneuver, index) => {
@@ -315,7 +337,10 @@ const RouteMap = ({ routeData, className = '' }) => {
                 <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
                     <h3 className="text-lg font-semibold text-gray-900">Route Map</h3>
                     <p className="text-sm text-gray-600 mt-1">
-                        Interactive map showing your route from {routeData.eta.from} to {routeData.eta.to}
+                        Interactive map showing your route from {routeData.eta.from}
+                        {routeData.route_metadata?.waypoint_names && routeData.route_metadata.waypoint_names.length > 0 && 
+                            ` via ${routeData.route_metadata.waypoint_names.join(', ')}`
+                        } to {routeData.eta.to}
                     </p>
                 </div>
 
@@ -337,6 +362,10 @@ const RouteMap = ({ routeData, className = '' }) => {
                         <div className="flex items-center gap-1">
                             <span>🏁</span>
                             <span className="text-gray-600">Destination</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <span>🛑</span>
+                            <span className="text-gray-600">Stops</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <span>📍</span>

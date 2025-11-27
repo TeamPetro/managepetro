@@ -259,7 +259,7 @@ async def optimize_route_ai(
     current_user: User = Depends(get_current_active_user),
     session: AsyncSession = Depends(get_db_session),
 ):
-    """AI-powered route optimization with TomTom route geometry (Protected)"""
+    """AI-powered route optimization with TomTom route geometry and waypoints support (Protected)"""
     try:
         # Get AI route optimization
         result = await llm_service.optimize_route(
@@ -279,12 +279,31 @@ async def optimize_route_ai(
         from_coords = get_coordinates_for_location(request.from_location)
         to_coords = get_coordinates_for_location(request.to_location)
         
+        # Process waypoints if provided
+        waypoint_coords = []
+        if request.waypoints:
+            for waypoint in request.waypoints:
+                coords = get_coordinates_for_location(waypoint)
+                if coords:
+                    waypoint_coords.append(coords)
+                else:
+                    _logger.warning(f"No coordinates found for waypoint: {waypoint}")
+        
         if from_coords and to_coords:
             try:
-                _logger.info(f"Fetching TomTom route from {from_coords} to {to_coords}")
+                route_description = f"{request.from_location}"
+                if waypoint_coords:
+                    waypoint_names = [wp for wp in request.waypoints if get_coordinates_for_location(wp)]
+                    route_description += f" via {', '.join(waypoint_names)}"
+                route_description += f" to {request.to_location}"
+                
+                _logger.info(f"Fetching TomTom route: {route_description}")
+                _logger.info(f"Coordinates - From: {from_coords}, Waypoints: {waypoint_coords}, To: {to_coords}")
+                
                 tomtom_data = await calculate_route_async(
                     origin=from_coords,
                     destination=to_coords,
+                    waypoints=waypoint_coords if waypoint_coords else None,
                     travelMode="truck",
                     routeType="fastest"
                 )
@@ -293,12 +312,20 @@ async def optimize_route_ai(
                 route_info = parse_tomtom_route_response(tomtom_data)
                 result.update(route_info)
                 
-                # Add coordinate metadata
+                # Add coordinate metadata including waypoints
                 result["route_metadata"] = result.get("route_metadata", {})
                 result["route_metadata"]["coordinates"] = {
                     "from": {"lat": from_coords[0], "lon": from_coords[1]},
                     "to": {"lat": to_coords[0], "lon": to_coords[1]}
                 }
+                
+                if waypoint_coords:
+                    result["route_metadata"]["coordinates"]["waypoints"] = [
+                        {"lat": wp[0], "lon": wp[1]} for wp in waypoint_coords
+                    ]
+                    result["route_metadata"]["waypoint_names"] = [
+                        wp for wp in request.waypoints if get_coordinates_for_location(wp)
+                    ]
                 
                 _logger.info(f"Added TomTom route geometry with {len(route_info.get('route_geometry', []))} points")
                 
