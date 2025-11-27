@@ -5,6 +5,9 @@ import {
   ClockIcon,
   CalendarIcon,
   TruckIcon,
+  PlusIcon,
+  XMarkIcon,
+  MapPinIcon,
 } from "@heroicons/react/24/outline";
 import { VEHICLE_TYPES, TIME_MODES } from "../constants/config";
 import { DEBOUNCE_DELAY } from "../config/env";
@@ -12,8 +15,10 @@ import { DEBOUNCE_DELAY } from "../config/env";
 function RouteForm({ onSubmit, isLoading = false }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [waypoints, setWaypoints] = useState([]);
   const [fromSuggestions, setFromSuggestions] = useState([]);
   const [toSuggestions, setToSuggestions] = useState([]);
+  const [waypointSuggestions, setWaypointSuggestions] = useState({});
   const [timeMode, setTimeMode] = useState(TIME_MODES.DEPARTURE);
   const [departureTime, setDepartureTime] = useState("");
   const [arrivalTime, setArrivalTime] = useState("");
@@ -85,6 +90,40 @@ function RouteForm({ onSubmit, isLoading = false }) {
 
   const fetchFrom = debounced((q) => getPredictions(q, setFromSuggestions));
   const fetchTo = debounced((q) => getPredictions(q, setToSuggestions));
+  const fetchWaypoint = debounced((q, index) => 
+    getPredictions(q, (suggestions) => 
+      setWaypointSuggestions(prev => ({ ...prev, [index]: suggestions }))
+    )
+  );
+
+  // Waypoint management functions
+  const addWaypoint = () => {
+    if (waypoints.length < 8) { // Match backend limit
+      setWaypoints([...waypoints, ""]);
+    }
+  };
+
+  const removeWaypoint = (index) => {
+    setWaypoints(waypoints.filter((_, i) => i !== index));
+    setWaypointSuggestions(prev => {
+      const updated = { ...prev };
+      delete updated[index];
+      return updated;
+    });
+  };
+
+  const updateWaypoint = (index, value, shouldFetch = true) => {
+    const updated = [...waypoints];
+    updated[index] = value;
+    setWaypoints(updated);
+    if (shouldFetch && value.length >= 3) {
+      fetchWaypoint(value, index);
+    } else if (!shouldFetch) {
+      setWaypointSuggestions(prev => ({ ...prev, [index]: [] }));
+    } else {
+      setWaypointSuggestions(prev => ({ ...prev, [index]: [] }));
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -96,6 +135,7 @@ function RouteForm({ onSubmit, isLoading = false }) {
         deliveryDate: deliveryDate || null,
         vehicleType,
         notes: notes.trim() || null,
+        waypoints: waypoints.filter(wp => wp.trim()).length > 0 ? waypoints.filter(wp => wp.trim()) : null,
       };
       onSubmit(from.trim(), to.trim(), timeData);
     }
@@ -190,6 +230,81 @@ function RouteForm({ onSubmit, isLoading = false }) {
               </ul>
             )}
           </div>
+        </div>
+
+        {/* Waypoints Section */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700">
+              Stops (Optional)
+            </label>
+            {waypoints.length < 8 && (
+              <button
+                type="button"
+                onClick={addWaypoint}
+                disabled={isLoading}
+                className="flex items-center space-x-1 text-xs sm:text-sm text-blue-600 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed"
+              >
+                <PlusIcon className="w-4 h-4" />
+                <span>Add Stop</span>
+              </button>
+            )}
+          </div>
+          
+          {waypoints.map((waypoint, index) => (
+            <div key={index} className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 text-xs text-gray-500">
+                  <MapPinIcon className="w-4 h-4" />
+                  <span>Stop {index + 1}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeWaypoint(index)}
+                  disabled={isLoading}
+                  className="text-red-500 hover:text-red-700 disabled:text-gray-400"
+                >
+                  <XMarkIcon className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={waypoint}
+                  onChange={(e) => updateWaypoint(index, e.target.value)}
+                  onBlur={() => setTimeout(() => {
+                    setWaypointSuggestions(prev => ({ ...prev, [index]: [] }));
+                  }, 120)}
+                  placeholder={`Enter stop ${index + 1} location`}
+                  autoComplete="off"
+                  disabled={isLoading}
+                  className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+                <MagnifyingGlassIcon className="absolute left-2.5 sm:left-3 top-2.5 sm:top-3.5 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+              </div>
+              {waypointSuggestions[index] && waypointSuggestions[index].length > 0 && (
+                <ul className="absolute bg-white border rounded-lg shadow-lg mt-1 w-full z-40 max-h-56 overflow-y-auto">
+                  {waypointSuggestions[index].map((s, i) => (
+                    <li
+                      key={`${s.placeId}-${i}`}
+                      onMouseDown={() => {
+                        updateWaypoint(index, s.name, false);
+                      }}
+                      className="px-4 py-2 hover:bg-blue-100 cursor-pointer text-sm"
+                    >
+                      {s.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+          
+          {waypoints.length === 0 && (
+            <p className="text-xs text-gray-500">
+              Add intermediate stops to create a multi-stop route. Routes can include up to 8 stops.
+            </p>
+          )}
         </div>
 
         {/* Time Preference */}
