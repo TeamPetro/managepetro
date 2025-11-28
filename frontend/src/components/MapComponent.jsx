@@ -18,6 +18,7 @@ const createCustomIcon = (color = 'blue', iconType = 'marker') => {
     end: '🏁', 
     fuel: '⛽',
     truck: '🚛',
+    waypoint: '🛑',
     marker: '📍'
   };
 
