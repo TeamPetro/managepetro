@@ -23,9 +23,19 @@ fastapi dev main.py
 
 ### Check If Things Are Working:
 
-- **Database running?** Visit: http://localhost:8000/docs
-- **See API documentation?** You're good to go!
-- **Get errors?** See troubleshooting below
+### Run All Backend Tests
+
+```powershell
+./run_tests.ps1
+```
+
+Or, simply run:
+
+```bash
+pytest
+```
+
+This will run all tests in the `backend/tests/` folder and show results.
 
 ## Key Files
 
@@ -102,6 +112,7 @@ When deploying the backend and frontend to separate hosting providers (e.g., bac
 ### Why is this needed?
 
 By default, the backend only allows requests from `localhost` and the production frontend URL hardcoded in the config. If you deploy to:
+
 - Multiple environments (staging, preview, production)
 - Dynamic URLs (Vercel preview deployments)
 - Different hosting providers
@@ -135,17 +146,20 @@ CORS_ORIGIN_REGEX=https://managepetro-.*\.vercel\.app
 ### How to Configure
 
 1. **Find your backend hosting provider's environment variables section**
+
    - Railway: Settings → Environment Variables
    - Render: Environment → Environment Variables
    - Heroku: Settings → Config Vars
 
 2. **Add the CORS configuration:**
+
    ```
    Variable: CORS_ORIGINS
    Value: https://your-frontend-url.com
    ```
 
 3. **If using Vercel preview deployments, also add:**
+
    ```
    Variable: CORS_ORIGIN_REGEX
    Value: https://your-app-name-.*\.vercel\.app
@@ -156,16 +170,18 @@ CORS_ORIGIN_REGEX=https://managepetro-.*\.vercel\.app
 ### Verifying CORS Configuration
 
 1. Check your backend logs on startup - you should see:
+
    ```
    INFO: Configuring CORS with X allowed origins
    INFO: CORS origin regex pattern: https://...
    ```
 
 2. Test in your browser's DevTools console on your frontend:
+
    ```javascript
-   fetch('https://your-backend.com/api/health')
-     .then(r => r.json())
-     .then(console.log)
+   fetch("https://your-backend.com/api/health")
+     .then((r) => r.json())
+     .then(console.log);
    ```
 
 3. If you see CORS errors, check:
@@ -177,6 +193,7 @@ CORS_ORIGIN_REGEX=https://managepetro-.*\.vercel\.app
 ### Common Deployment Scenarios
 
 **Vercel Frontend + Railway Backend:**
+
 ```bash
 # On Railway backend:
 CORS_ORIGINS=https://your-app.vercel.app
@@ -184,12 +201,14 @@ CORS_ORIGIN_REGEX=https://your-app-.*\.vercel\.app
 ```
 
 **Netlify Frontend + Render Backend:**
+
 ```bash
 # On Render backend:
 CORS_ORIGINS=https://your-app.netlify.app,https://staging--your-app.netlify.app
 ```
 
 **Custom Domain:**
+
 ```bash
 CORS_ORIGINS=https://app.yourdomain.com
 ```
@@ -244,4 +263,3 @@ pip install -r requirements.txt
 docker compose up -d       # Start fresh
 fastapi dev main.py       # Restart server
 ```
- 

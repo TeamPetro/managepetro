@@ -114,27 +114,41 @@ function RoutePage({ selectedLLM }) {
 
             {/* --- Balanced, aesthetic grid layout --- */}
             <div className="space-y-10">
-              {/* 2-column grid with matching panel styles */}
+              {/* 2-column grid: equal width */}
               <div className="grid gap-8 lg:grid-cols-2">
-                {/* LEFT PANEL */}
-                <div className="space-y-6 bg-slate-900/60 border border-slate-800 rounded-2xl p-6 h-full">
-                  <ETADisplay eta={routeData.eta} />
+                {/* LEFT PANEL - Trip Estimation */}
+                <CollapsibleSection
+                  title="Trip Estimation"
+                  description="Review estimated travel time and distance for this delivery."
+                  defaultOpen={true}
+                >
+                  <div className="space-y-6">
+                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+                      <ETADisplay eta={routeData.eta} />
+                    </div>
 
-                  {(routeData.aiAnalysis || routeData.routeSummary) && (
-                    <AIAnalysisCard
-                      aiAnalysis={routeData.aiAnalysis}
-                      routeSummary={routeData.routeSummary}
+                    {(routeData.aiAnalysis || routeData.routeSummary) && (
+                      <AIAnalysisCard
+                        aiAnalysis={routeData.aiAnalysis}
+                        routeSummary={routeData.routeSummary}
+                      />
+                    )}
+                  </div>
+                </CollapsibleSection>
+
+                {/* RIGHT PANEL - Turn-by-Turn Directions */}
+                <CollapsibleSection
+                  title="Turn-by-Turn Directions"
+                  description="Step-by-step maneuvers and navigation instructions for the route."
+                  defaultOpen={true}
+                >
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+                    <InstructionsList
+                      instructions={routeData.instructions}
+                      maneuvers={routeData.maneuvers}
                     />
-                  )}
-                </div>
-
-                {/* RIGHT PANEL */}
-                <div className="space-y-6 bg-slate-900/60 border border-slate-800 rounded-2xl p-6 h-full">
-                  <InstructionsList
-                    instructions={routeData.instructions}
-                    maneuvers={routeData.maneuvers}
-                  />
-                </div>
+                  </div>
+                </CollapsibleSection>
               </div>
 
               {/* MAP tucked below in a clean card */}
