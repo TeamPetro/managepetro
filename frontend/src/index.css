@@ -19,7 +19,7 @@
 */
 html.dark {
   /* Override common background utilities */
-  --bg-white: #0f1724; /* used in place of bg-white */
+  --bg-white: #0f1724; /*used in place of bg-white */
   --bg-gray-50: #0b1220;
   --bg-blue-50: #071428;
   --bg-purple-50: #0b0b1a;
