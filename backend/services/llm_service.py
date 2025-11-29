@@ -1,14 +1,12 @@
+# from google import genai
+# from google.genai import types
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, text
 from sqlalchemy.exc import SQLAlchemyError
 from .prompt_service import PromptService
 from .api_utils import get_weather_async
-from models.database_models import (
-    Station,
-    Truck,
-    Delivery,
-    DriverShift as DriverShiftORM,
-)
+from config import config
+from models.database_models import Station, Truck, Delivery
 from models.data_models import (
     StationData,
     DeliveryData,
@@ -21,13 +19,11 @@ from models.data_models import (
 from typing import Dict, Any, Optional, List
 import logging
 import re
-import asyncio
 from utils.serializers import station_available_dict, truck_simple_dict
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from .lc_router import get_chat_model
-import os
-from datetime import datetime, timezone
+import os 
 
 
 class LLMService:
@@ -56,6 +52,8 @@ class LLMService:
         """
         if not text:
             return text
+
+        import re
 
         cleaned = text
         # Remove bold markdown (**text**)
@@ -96,18 +94,18 @@ class LLMService:
         return result
 
     async def optimize_route(
-        self,
-        from_location: str,
-        to_location: str,
-        session: AsyncSession,
-        # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
-        departure_time: Optional[str] = None,
-        arrival_time: Optional[str] = None,
-        time_mode: str = "departure",
-        delivery_date: Optional[str] = None,
-        vehicle_type: str = "fuel_delivery_truck",
-        notes: Optional[str] = None,
+    self,
+    from_location: str,
+    to_location: str,
+    session: AsyncSession,
+    # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
+    llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
+    departure_time: Optional[str] = None,
+    arrival_time: Optional[str] = None,
+    time_mode: str = "departure",
+    delivery_date: Optional[str] = None,
+    vehicle_type: str = "fuel_delivery_truck",
+    notes: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate route optimization using standardized data models with SQLAlchemy 2.0"""
 
@@ -151,12 +149,12 @@ class LLMService:
         )
 
     async def optimize_dispatch(
-        self,
-        truck_id: str,
-        depot_location: str,
-        session: AsyncSession,
-        # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
+    self,
+    truck_id: str,
+    depot_location: str,
+    session: AsyncSession,
+    # Default model is Gemini 2.5 Flash; override by passing llm_model in API request (e.g., 'openai:gpt-4o', 'anthropic:claude-3-sonnet')
+    llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
     ) -> Dict[str, Any]:
         """Optimize dispatch route for a truck to deliver fuel to stations in need using SQLAlchemy 2.0"""
         try:
@@ -214,101 +212,6 @@ class LLMService:
             print(f"Dispatch optimization failed: {e}")
             raise
 
-    async def get_dispatch_recommendations(
-        self,
-        depot_location: str,
-        session: AsyncSession,
-        llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-2.5-flash"),
-        max_recommendations: int = 5,
-        filter_region: Optional[str] = None,
-        filter_city: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Get batch dispatch recommendations for optimal truck-station matching using SQLAlchemy 2.0"""
-        try:
-            # Get all available trucks (limit to prevent prompt overflow)
-            all_trucks = await self.get_all_trucks_sqlalchemy(session)
-            available_trucks = [
-                truck for truck in all_trucks if truck.status == "active"
-            ][
-                :15
-            ]  # Limit to 15 trucks max to prevent timeouts
-
-            if not available_trucks:
-                return {
-                    "recommendations": [],
-                    "summary": "No active trucks available for dispatch",
-                    "total_trucks": 0,
-                    "total_stations": 0,
-                }
-
-            # Get stations needing fuel (limit to prevent prompt overflow)
-            stations_needing_fuel = await self._get_stations_needing_refuel_sqlalchemy(
-                session
-            )
-            # Prioritize by fuel level and limit to 25 stations max
-            stations_needing_fuel = sorted(
-                stations_needing_fuel, key=lambda s: s.fuel_level_percent
-            )[:25]
-
-            # Apply filters if provided
-            if filter_region:
-                stations_needing_fuel = [
-                    s
-                    for s in stations_needing_fuel
-                    if s.region and filter_region.lower() in s.region.lower()
-                ]
-
-            if filter_city:
-                stations_needing_fuel = [
-                    s
-                    for s in stations_needing_fuel
-                    if s.city and filter_city.lower() in s.city.lower()
-                ]
-
-            if not stations_needing_fuel:
-                return {
-                    "recommendations": [],
-                    "summary": "No stations requiring fuel delivery at this time",
-                    "total_trucks": len(available_trucks),
-                    "total_stations": 0,
-                }
-
-            # Get weather for depot location
-            try:
-                depot_weather = await get_weather_async(depot_location)
-            except:
-                depot_weather = WeatherData(depot_location, 20, "Clear", 10, 50)
-
-            # Create batch dispatch prompt
-            prompt = self.prompt_service.format_batch_dispatch_prompt(
-                trucks=available_trucks,
-                stations=stations_needing_fuel,
-                depot_location=depot_location,
-                depot_weather=depot_weather,
-                max_recommendations=max_recommendations,
-            )
-
-            # Get AI recommendations with extended timeout for batch processing
-            ai_response = await self._call_llm(prompt, llm_model, timeout=180)
-
-            # Parse the response
-            return self._parse_batch_dispatch_response(
-                ai_response=ai_response,
-                trucks=available_trucks,
-                stations=stations_needing_fuel,
-                depot_location=depot_location,
-                max_recommendations=max_recommendations,
-            )
-
-        except asyncio.TimeoutError:
-            self._logger.error("Batch dispatch recommendations timed out after 180s")
-            raise Exception(
-                "AI request timed out. Try reducing the number of trucks/stations or try again later."
-            )
-        except Exception as e:
-            self._logger.exception("Batch dispatch recommendations failed")
-            raise
-
     async def _get_database_data_sqlalchemy(
         self, session: AsyncSession, from_location: str, to_location: str
     ) -> DatabaseResult:
@@ -335,8 +238,6 @@ class LLMService:
                     fuel_type=station.fuel_type,
                     capacity_liters=station.capacity_liters,
                     current_level_liters=station.current_level_liters,
-                    request_method=station.request_method,
-                    low_fuel_threshold=station.low_fuel_threshold,
                 )
                 for station in stations_orm
             ]
@@ -362,7 +263,7 @@ class LLMService:
                 .where(
                     and_(
                         Delivery.delivery_date
-                        >= func.now() - text("INTERVAL '30 days'"),
+                        >= func.date_sub(func.now(), text("INTERVAL 30 DAY")),
                         or_(
                             Station.city.like(f"%{from_location}%"),
                             Station.region.like(f"%{from_location}%"),
@@ -493,10 +394,8 @@ class LLMService:
 
             trucks = []
             for truck in trucks_orm:
-                # Get compartments and current driver using SQLAlchemy relationships
-                await session.refresh(
-                    truck, attribute_names=["compartments", "current_driver"]
-                )
+                # Get compartments using SQLAlchemy relationship
+                await session.refresh(truck, attribute_names=["compartments"])
 
                 compartments = []
                 for comp in truck.compartments:
@@ -509,47 +408,6 @@ class LLMService:
                         }
                     )
 
-                # Get driver information if truck has an assigned driver
-                driver_name = None
-                driver_status = None
-                driver_hours_remaining = None
-
-                if truck.current_driver:
-                    driver = truck.current_driver
-                    driver_name = f"{driver.first_name} {driver.last_name}"
-                    driver_status = driver.status
-
-                    # Calculate hours remaining for driver today
-                    if driver.max_hours_per_shift:
-                        today_start = datetime.now(timezone.utc).replace(
-                            hour=0, minute=0, second=0, microsecond=0
-                        )
-
-                        shift_stmt = select(
-                            func.coalesce(
-                                func.sum(
-                                    func.extract(
-                                        "epoch",
-                                        func.coalesce(
-                                            DriverShiftORM.shift_end, func.now()
-                                        )
-                                        - DriverShiftORM.shift_start,
-                                    )
-                                    / 3600
-                                ),
-                                0,
-                            )
-                        ).where(
-                            and_(
-                                DriverShiftORM.driver_id == driver.id,
-                                DriverShiftORM.shift_start >= today_start,
-                            )
-                        )
-                        shift_result = await session.execute(shift_stmt)
-                        current_hours = float(shift_result.scalar() or 0)
-                        max_hours = float(driver.max_hours_per_shift)
-                        driver_hours_remaining = max(0, max_hours - current_hours)
-
                 truck_data = TruckData(
                     id=truck.id,
                     code=truck.code,
@@ -561,25 +419,6 @@ class LLMService:
                     fuel_type=truck.fuel_type,
                     status=truck.status,
                     compartments=compartments,
-                    current_driver_id=truck.current_driver_id,
-                    driver_name=driver_name,
-                    driver_status=driver_status,
-                    driver_hours_remaining=driver_hours_remaining,
-                    current_location=(
-                        truck.current_location
-                        if hasattr(truck, "current_location")
-                        else None
-                    ),
-                    last_maintenance_date=(
-                        truck.last_maintenance_date
-                        if hasattr(truck, "last_maintenance_date")
-                        else None
-                    ),
-                    next_maintenance_date=(
-                        truck.next_maintenance_date
-                        if hasattr(truck, "next_maintenance_date")
-                        else None
-                    ),
                 )
                 trucks.append(truck_data)
 
@@ -634,10 +473,8 @@ class LLMService:
             self._logger.debug(
                 "Found truck: ID=%s, code=%s", truck_orm.id, truck_orm.code
             )
-            # Get compartments and current driver using SQLAlchemy relationship
-            await session.refresh(
-                truck_orm, attribute_names=["compartments", "current_driver"]
-            )
+            # Get compartments using SQLAlchemy relationship
+            await session.refresh(truck_orm, attribute_names=["compartments"])
 
             compartments = []
             for comp in truck_orm.compartments:
@@ -649,45 +486,6 @@ class LLMService:
                         "current_level_liters": float(comp.current_level_liters),
                     }
                 )
-
-            # Get driver information if truck has an assigned driver
-            driver_name = None
-            driver_status = None
-            driver_hours_remaining = None
-
-            if truck_orm.current_driver:
-                driver = truck_orm.current_driver
-                driver_name = f"{driver.first_name} {driver.last_name}"
-                driver_status = driver.status
-
-                # Calculate hours remaining for driver today
-                if driver.max_hours_per_shift:
-                    today_start = datetime.now(timezone.utc).replace(
-                        hour=0, minute=0, second=0, microsecond=0
-                    )
-
-                    shift_stmt = select(
-                        func.coalesce(
-                            func.sum(
-                                func.extract(
-                                    "epoch",
-                                    func.coalesce(DriverShiftORM.shift_end, func.now())
-                                    - DriverShiftORM.shift_start,
-                                )
-                                / 3600
-                            ),
-                            0,
-                        )
-                    ).where(
-                        and_(
-                            DriverShiftORM.driver_id == driver.id,
-                            DriverShiftORM.shift_start >= today_start,
-                        )
-                    )
-                    shift_result = await session.execute(shift_stmt)
-                    current_hours = float(shift_result.scalar() or 0)
-                    max_hours = float(driver.max_hours_per_shift)
-                    driver_hours_remaining = max(0, max_hours - current_hours)
 
             return TruckData(
                 id=truck_orm.id,
@@ -702,10 +500,6 @@ class LLMService:
                 fuel_type=truck_orm.fuel_type,
                 status=truck_orm.status,
                 compartments=compartments,
-                current_driver_id=truck_orm.current_driver_id,
-                driver_name=driver_name,
-                driver_status=driver_status,
-                driver_hours_remaining=driver_hours_remaining,
             )
         except SQLAlchemyError as e:
             self._logger.exception("SQLAlchemy error getting truck by ID")
@@ -755,6 +549,8 @@ class LLMService:
                     current_level_liters=station.current_level_liters,
                     request_method=station.request_method,
                     low_fuel_threshold=station.low_fuel_threshold,
+                    needs_refuel=station.current_level_liters
+                    < station.low_fuel_threshold,
                 )
                 stations.append(station_data)
 
@@ -864,8 +660,7 @@ class LLMService:
             else:
                 self._logger.exception("API call failed: %s", e)
                 raise
-
-    async def _call_llm(self, prompt: str, model_id: str, timeout: int = 120) -> str:
+    async def _call_llm(self, prompt: str, model_id: str) -> str:
         """
         Generic async LLM call via LangChain with multi-provider support
         (OpenAI, Anthropic, or Google Gemini)
@@ -876,20 +671,14 @@ class LLMService:
             prompt_template = ChatPromptTemplate.from_template("{input}")
             chain = prompt_template | chat | StrOutputParser()
 
-            # Add timeout to prevent hanging requests
-            result = await asyncio.wait_for(
-                chain.ainvoke({"input": prompt}), timeout=timeout
-            )
+            result = await chain.ainvoke({"input": prompt})
 
             # Sanitize basic HTML/Markdown
-
+            import re
             result = re.sub(r"(?i)<script.*?>.*?</script>", "", result, flags=re.DOTALL)
             result = result.replace("<", "&lt;").replace(">", "&gt;")
 
             return result.strip()
-        except asyncio.TimeoutError:
-            self._logger.error("LLM call timed out after %d seconds", timeout)
-            raise asyncio.TimeoutError(f"LLM request timed out after {timeout} seconds")
         except Exception as e:
             self._logger.exception("LLM call failed: %s", e)
             raise Exception(f"LLM call failed: {e}")
@@ -987,6 +776,7 @@ class LLMService:
         - Parses inline and next-line distance/duration info
         """
 
+        import re
         directions = []
 
         try:
@@ -1016,11 +806,7 @@ class LLMService:
 
                 # 3️⃣ Try inline "(12.3 km, 15 min)" format
                 paren_match = re.search(r"\(([^)]+)\)", instruction)
-                if (
-                    paren_match
-                    and "km" in paren_match.group(1)
-                    and "min" in paren_match.group(1)
-                ):
+                if paren_match and "km" in paren_match.group(1) and "min" in paren_match.group(1):
                     parts = [p.strip() for p in paren_match.group(1).split(",")]
                     if len(parts) >= 2:
                         distance, duration = parts[0], parts[1]
@@ -1029,9 +815,7 @@ class LLMService:
 
                 # 4️⃣ Try next-line "Distance: ... | Duration: ..." format
                 step_end = match.end()
-                next_chunk = text_to_parse[step_end:].split("\n", 3)[
-                    :3
-                ]  # next few lines
+                next_chunk = text_to_parse[step_end:].split("\n", 3)[:3]  # next few lines
                 for line in next_chunk:
                     line = line.strip()
                     if "Distance:" in line and "Duration:" in line and "|" in line:
@@ -1067,9 +851,7 @@ class LLMService:
 
             # 6️⃣ Fallback: Look for numbered lines in the entire AI response if section is empty
             if not directions:
-                fallback_steps = re.findall(
-                    r"^\s*(\d+)[\.\)\-]\s+(.*)$", ai_response, flags=re.M
-                )
+                fallback_steps = re.findall(r"^\s*(\d+)[\.\)\-]\s+(.*)$", ai_response, flags=re.M)
                 for idx, (_, instr) in enumerate(fallback_steps, start=1):
                     directions.append(
                         {
@@ -1243,24 +1025,6 @@ class LLMService:
                                 "step_number": step_number,
                                 "station": station_info,
                             }
-
-                            # Extract station code from station_info (e.g., "Station Name (STN-001)")
-                            # Look for pattern (CODE) at the end
-                            code_match = re.search(
-                                r"\(([A-Z0-9-]+)\)\s*$", station_info
-                            )
-                            if code_match:
-                                current_stop["station_code"] = code_match.group(1)
-                            else:
-                                # Try to find station code by matching against available stations
-                                # Look for station code patterns in the text
-                                for station in stations:
-                                    if station.code and station.code in station_info:
-                                        current_stop["station_code"] = station.code
-                                        break
-                                    elif station.name and station.name in station_info:
-                                        current_stop["station_code"] = station.code
-                                        break
                         except (ValueError, IndexError):
                             # Fallback if step number parsing fails
                             station_info = self._clean_markdown(
@@ -1303,149 +1067,5 @@ class LLMService:
             "depot_location": depot_location,
             "route_stops": route_stops,
             "stations_available": [station_available_dict(s) for s in stations],
-            "ai_analysis": ai_response,
-        }
-
-    def _parse_batch_dispatch_response(
-        self,
-        ai_response: str,
-        trucks: List[TruckData],
-        stations: List[StationData],
-        depot_location: str,
-        max_recommendations: int,
-    ) -> Dict[str, Any]:
-        """Parse AI response for batch dispatch recommendations"""
-        recommendations = []
-        executive_summary = ""
-
-        # Create a lookup dict for trucks by code for efficient matching
-        trucks_by_code = {truck.code: truck for truck in trucks}
-
-        try:
-            # Extract executive summary
-            summary_section = self._extract_section(ai_response, "EXECUTIVE SUMMARY")
-            if summary_section:
-                # Get first non-empty line
-                lines = [
-                    line.strip() for line in summary_section.split("\n") if line.strip()
-                ]
-                if lines:
-                    executive_summary = self._clean_markdown(lines[0])
-
-            # Extract individual recommendations
-            recommendations_section = self._extract_section(
-                ai_response, "DISPATCH RECOMMENDATIONS"
-            )
-
-            if recommendations_section:
-                # Split by "Recommendation" headers
-                rec_blocks = re.split(
-                    r"\*\*Recommendation \d+:\*\*", recommendations_section
-                )
-
-                for block in rec_blocks[1:]:  # Skip first empty split
-                    rec = {}
-                    lines = block.split("\n")
-
-                    for line in lines:
-                        line = line.strip()
-                        if line.startswith("Truck:"):
-                            rec["truck_code"] = self._clean_markdown(
-                                line.split(":", 1)[1].strip()
-                            )
-                        elif line.startswith("Priority:"):
-                            rec["priority"] = self._clean_markdown(
-                                line.split(":", 1)[1].strip()
-                            )
-                        elif line.startswith("Stations:"):
-                            rec["station_count"] = self._clean_markdown(
-                                line.split(":", 1)[1].strip()
-                            )
-                        elif line.startswith("Route:"):
-                            rec["route"] = self._clean_markdown(
-                                line.split(":", 1)[1].strip()
-                            )
-                        elif line.startswith("Total Distance:"):
-                            rec["total_distance"] = self._clean_markdown(
-                                line.split(":", 1)[1].strip()
-                            )
-                        elif line.startswith("Estimated Duration:"):
-                            rec["estimated_duration"] = self._clean_markdown(
-                                line.split(":", 1)[1].strip()
-                            )
-                        elif line.startswith("Total Fuel Delivery:"):
-                            rec["total_fuel"] = self._clean_markdown(
-                                line.split(":", 1)[1].strip()
-                            )
-                        elif line.startswith("Rationale:"):
-                            rec["rationale"] = self._clean_markdown(
-                                line.split(":", 1)[1].strip()
-                            )
-
-                    if rec and "truck_code" in rec:
-                        # Enrich recommendation with truck data from database
-                        truck_code = rec["truck_code"]
-                        matched_truck = trucks_by_code.get(truck_code)
-
-                        if matched_truck:
-                            # Add truck details to recommendation
-                            rec["truck_plate"] = matched_truck.plate
-                            rec["truck_capacity_liters"] = matched_truck.capacity_liters
-                            rec["truck_fuel_level_percent"] = (
-                                matched_truck.fuel_level_percent
-                            )
-                            rec["truck_fuel_type"] = matched_truck.fuel_type
-                            rec["truck_status"] = matched_truck.status
-
-                            # Add driver information if available
-                            if matched_truck.driver_name:
-                                rec["driver_name"] = matched_truck.driver_name
-                                rec["driver_status"] = matched_truck.driver_status
-                                rec["driver_hours_remaining"] = (
-                                    matched_truck.driver_hours_remaining
-                                )
-
-                            # Add calculated fields
-                            rec["cargo_fuel_liters"] = matched_truck.cargo_fuel_liters
-                            rec["max_range_km"] = matched_truck.max_range_km
-
-                        # Rename total_fuel to total_fuel_delivery for clarity
-                        if "total_fuel" in rec:
-                            rec["total_fuel_delivery"] = rec.pop("total_fuel")
-
-                        # Add route_summary from route field if present
-                        if "route" in rec:
-                            rec["route_summary"] = rec["route"]
-
-                        recommendations.append(rec)
-
-            # Extract efficiency analysis
-            efficiency_analysis = {}
-            efficiency_section = self._extract_section(
-                ai_response, "EFFICIENCY ANALYSIS"
-            )
-            if efficiency_section:
-                lines = efficiency_section.split("\n")
-                for line in lines:
-                    line = line.strip()
-                    if line.startswith("-"):
-                        line = line[1:].strip()
-                        if ":" in line:
-                            key, value = line.split(":", 1)
-                            key = key.strip().lower().replace(" ", "_")
-                            efficiency_analysis[key] = self._clean_markdown(
-                                value.strip()
-                            )
-
-        except Exception:
-            self._logger.exception("Error parsing batch dispatch response")
-
-        return {
-            "summary": executive_summary,
-            "recommendations": recommendations[:max_recommendations],
-            "efficiency_analysis": efficiency_analysis,
-            "total_trucks": len(trucks),
-            "total_stations": len(stations),
-            "depot_location": depot_location,
             "ai_analysis": ai_response,
         }
