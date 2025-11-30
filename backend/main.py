@@ -884,8 +884,15 @@ async def login_user(
         if not user:
             raise HTTPException(
                 status_code=401,
-                detail="Incorrect username or password",
+                detail="Incorrect username or password. Please try again.",
                 headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Check if user account is active
+        if not user.is_active:
+            raise HTTPException(
+                status_code=403,
+                detail="Your account has been deactivated. Please contact support.",
             )
 
         access_token_expires = timedelta(minutes=config.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
