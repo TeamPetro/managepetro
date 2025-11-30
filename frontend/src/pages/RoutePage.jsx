@@ -16,10 +16,15 @@ import PageLayout from "../components/PageLayout";
 import CollapsibleSection from "../components/CollapsibleSection";
 import RouteLoadingBar from "../components/RouteLoadingBar";
 import { useRouteData } from "../hooks/useRouteData";
+import { useLocation } from "react-router-dom";
 
 function RoutePage({ selectedLLM }) {
+  const location = useLocation();
   const { routeData, calculateRoute, clearRoute, isLoading, error } =
     useRouteData();
+
+  // Extract prefilled data from navigation state
+  const prefilledData = location.state?.prefilledData || null;
 
   const handleRouteSubmit = async (from, to, timeData = {}) => {
     await calculateRoute(from, to, selectedLLM, timeData);
@@ -43,7 +48,11 @@ function RoutePage({ selectedLLM }) {
             </h2>
 
             <div className="space-y-6">
-              <RouteForm onSubmit={handleRouteSubmit} isLoading={isLoading} />
+              <RouteForm 
+                onSubmit={handleRouteSubmit} 
+                isLoading={isLoading} 
+                initialData={prefilledData}
+              />
 
               {error && (
                 <AIErrorMessage
@@ -81,7 +90,11 @@ function RoutePage({ selectedLLM }) {
               defaultOpen={false}
             >
               <div className="space-y-4">
-                <RouteForm onSubmit={handleRouteSubmit} isLoading={isLoading} />
+                <RouteForm 
+                  onSubmit={handleRouteSubmit} 
+                  isLoading={isLoading} 
+                  initialData={prefilledData}
+                />
 
                 {error && (
                   <AIErrorMessage

@@ -1,5 +1,5 @@
 # from google import genai
-# from google.genai import types
+from google.genai import types
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -17,6 +17,7 @@ from models.data_models import (
     RouteOptimizationResponse,
 )
 from typing import Dict, Any, Optional, List
+from datetime import datetime, timedelta
 import logging
 import re
 from utils.serializers import station_available_dict, truck_simple_dict
@@ -263,7 +264,7 @@ class LLMService:
                 .where(
                     and_(
                         Delivery.delivery_date
-                        >= func.date_sub(func.now(), text("INTERVAL 30 DAY")),
+                        >= (datetime.now() - timedelta(days=30)),
                         or_(
                             Station.city.like(f"%{from_location}%"),
                             Station.region.like(f"%{from_location}%"),
