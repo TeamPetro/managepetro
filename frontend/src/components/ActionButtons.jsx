@@ -4,7 +4,7 @@ function ActionButtons({ onEditParameters, onViewReferences }) {
       <button
         type="button"
         onClick={onEditParameters}
-        className="inline-flex items-center rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-100 hover:bg-slate-700 hover:border-slate-500 transition-colors"
+        className="inline-flex items-center rounded-lg border border-slate-600 bg-slate-600 px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-100 hover:bg-slate-700 hover:border-slate-500 transition-colors"
       >
         Edit Parameters
       </button>
@@ -12,7 +12,7 @@ function ActionButtons({ onEditParameters, onViewReferences }) {
       <button
         type="button"
         onClick={onViewReferences}
-        className="inline-flex items-center rounded-lg border border-slate-600 bg-slate-800/40 px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-100 hover:bg-slate-700 hover:border-slate-500 transition-colors"
+        className="inline-flex items-center rounded-lg border border-slate-600 bg-slate-600 px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-100 hover:bg-slate-700 hover:border-slate-500 transition-colors"
       >
         View References
       </button>
