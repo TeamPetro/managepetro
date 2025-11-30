@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTrucks } from "../hooks/useTruckQueries";
 import { useStations } from "../hooks/useStationQueries";
 import { useOptimizeDispatch } from "../hooks/useDispatchQueries";
@@ -17,6 +18,8 @@ import {
   FunnelIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  MapIcon,
+  CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import Api from "../services/api";
 import {
@@ -29,12 +32,14 @@ import {
 } from "../constants/config";
 
 function DispatcherPage() {
+  const navigate = useNavigate();
   const [selectedTruck, setSelectedTruck] = useState(null);
   const [dispatchResult, setDispatchResult] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [depotLocation, setDepotLocation] = useState(DEFAULT_DEPOT_LOCATION);
   const [llmModel, setLlmModel] = useState(DEFAULT_LLM_MODEL);
   const [dispatchError, setDispatchError] = useState(null);
+  const [selectedStations, setSelectedStations] = useState([]);
 
   // Fleet filtering and search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -138,6 +143,44 @@ function DispatcherPage() {
         },
       }
     );
+  };
+
+  // Station selection handlers
+  const toggleStationSelection = (stationId) => {
+    setSelectedStations(prev => {
+      if (prev.includes(stationId)) {
+        return prev.filter(id => id !== stationId);
+      } else {
+        return [...prev, stationId];
+      }
+    });
+  };
+
+  const selectAllStations = () => {
+    setSelectedStations(stations.map(s => s.station_id));
+  };
+
+  const clearStationSelection = () => {
+    setSelectedStations([]);
+  };
+
+  const createRouteFromStations = () => {
+    if (selectedStations.length === 0) return;
+    
+    const selectedStationData = stations.filter(s => selectedStations.includes(s.station_id));
+    const waypoints = selectedStationData.map(s => `${s.city}, ${s.region}`);
+    
+    // Navigate to route page with pre-filled data
+    navigate('/', {
+      state: {
+        prefilledData: {
+          from: depotLocation,
+          to: waypoints[waypoints.length - 1], // Last station as destination
+          waypoints: waypoints.slice(0, -1), // All but last as waypoints
+          notes: `Fuel delivery route for ${selectedStations.length} stations: ${selectedStationData.map(s => s.name).join(', ')}`
+        }
+      }
+    });
   };
 
   if (isLoading) {
@@ -445,16 +488,62 @@ function DispatcherPage() {
             />
           ) : (
             <>
-              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">
-                Stations Requiring Fuel ({stations.length})
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+                  Stations Requiring Fuel ({stations.length})
+                </h2>
+                {stations.length > 0 && (
+                  <div className="flex items-center space-x-3">
+                    <div className="text-sm text-gray-600">
+                      {selectedStations.length} selected
+                    </div>
+                    <button
+                      onClick={selectedStations.length === stations.length ? clearStationSelection : selectAllStations}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      {selectedStations.length === stations.length ? 'Clear All' : 'Select All'}
+                    </button>
+                    {selectedStations.length > 0 && (
+                      <button
+                        onClick={createRouteFromStations}
+                        className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                      >
+                        <MapIcon className="w-4 h-4" />
+                        <span>Create Route ({selectedStations.length})</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="space-y-4">
                 {stations.map((station) => (
-                  <StationNeedsCard
-                    key={station.station_id}
-                    station={station}
-                  />
+                  <div key={station.station_id} className="relative">
+                    <div className="absolute bottom-3 right-3 z-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedStations.includes(station.station_id)}
+                        onChange={() => toggleStationSelection(station.station_id)}
+                        className="w-5 h-5 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 shadow-sm"
+                      />
+                    </div>
+                    <div className={`transition-all duration-200 ${
+                      selectedStations.includes(station.station_id) 
+                        ? 'ring-2 ring-blue-500 bg-blue-50' 
+                        : ''
+                    }`}>
+                      <StationNeedsCard
+                        key={station.station_id}
+                        station={station}
+                      />
+                    </div>
+                  </div>
                 ))}
+                {stations.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <MapPinIcon className="mx-auto h-12 w-12 mb-3" />
+                    <p>No stations currently need fuel delivery</p>
+                  </div>
+                )}
               </div>
             </>
           )}

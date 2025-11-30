@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   MagnifyingGlassIcon,
   ArrowRightIcon,
@@ -12,7 +12,7 @@ import {
 import { VEHICLE_TYPES, TIME_MODES } from "../constants/config";
 import { DEBOUNCE_DELAY } from "../config/env";
 
-function RouteForm({ onSubmit, isLoading = false }) {
+function RouteForm({ onSubmit, isLoading = false, initialData = null }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [waypoints, setWaypoints] = useState([]);
@@ -25,6 +25,16 @@ function RouteForm({ onSubmit, isLoading = false }) {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [vehicleType, setVehicleType] = useState(VEHICLE_TYPES[0].value);
   const [notes, setNotes] = useState("");
+
+  // Handle initial data from navigation
+  useEffect(() => {
+    if (initialData) {
+      if (initialData.from) setFrom(initialData.from);
+      if (initialData.to) setTo(initialData.to);
+      if (initialData.waypoints) setWaypoints(initialData.waypoints);
+      if (initialData.notes) setNotes(initialData.notes);
+    }
+  }, [initialData]);
 
   // --- ensure Places library is ready (no callback racing) ---
   const ensurePlacesReady = () =>
